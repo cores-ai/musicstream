@@ -95,6 +95,7 @@ async function extractDirectStreamUrl(target, isVideo = false) {
     : `https://www.youtube.com/watch?v=${videoId}`;
 
   const { stdout } = await execFileAsync("yt-dlp", [
+    "--extractor-args", "youtube:player_client=ios,android,web_creator,mweb",
     "-f", format,
     "-g", // print direct stream url
     "--no-warnings",
