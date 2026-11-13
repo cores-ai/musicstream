@@ -9,7 +9,7 @@ dotenv.config();
 
 const execFileAsync = promisify(execFile);
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 const VALID_API_KEY = process.env.API_KEY || "cores_secret_key_2026";
 
 app.use(cors());
