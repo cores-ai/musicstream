@@ -316,16 +316,18 @@ def _extract_and_download(video_url, base_opts):
     cookie_file = get_active_cookie_file()
 
     strategies = [
-        # Strategy 1: Android client (most reliable on datacenter IPs, no bot-check)
-        {'player_client': ['android']},
-        # Strategy 2: visionos client (complete format list, bypasses bot check)
-        {'player_client': ['visionos']},
-        # Strategy 3: web_creator client
-        {'player_client': ['web_creator']},
-        # Strategy 4: web_embedded with cookies if available
+        # Strategy 1: Android client with cookies if available (fastest on datacenter IPs)
+        {'player_client': ['android'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['android']},
+        # Strategy 2: Web embedded with cookies (reliable fallback)
         {'player_client': ['web_embedded'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['web_embedded']},
-        # Strategy 5: mobile web with cookies if available
+        # Strategy 3: Mobile web with cookies
         {'player_client': ['mweb'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['mweb']},
+        # Strategy 4: iOS client
+        {'player_client': ['ios'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['ios']},
+        # Strategy 5: visionos client
+        {'player_client': ['visionos']},
+        # Strategy 6: web_creator client
+        {'player_client': ['web_creator']},
     ]
 
     last_error = None
