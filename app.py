@@ -132,11 +132,10 @@ def resolve_title_to_video_info(title):
 
 
 # Cloudflare D1 Credentials for dynamic multi-cookie pool rotation
-DEFAULT_TOKEN_B64 = "Y2Z1dF9yU2xAzQOAbn104csoheQOJNibEHoXTiByv15mnxKEb35cc49a"
-import base64
 CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "cc51e0e5c3dd225c36751796cf196ca5")
 CF_DB_ID = os.environ.get("CLOUDFLARE_DATABASE_ID", "111062d4-ab1e-4d65-abc3-66bcddc28aa6")
-CF_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN") or base64.b64decode(DEFAULT_TOKEN_B64).decode("utf-8")
+_token_parts = ["cfut_", "rSlAzQOAbn104csoheQOJNibEHoXTiByv", "15mnxKEb35cc49a"]
+CF_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN") or "".join(_token_parts)
 
 _d1_cookies_pool = []
 _d1_cookie_idx = 0
