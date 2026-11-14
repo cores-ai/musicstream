@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beats Stream — YouTube Audio & Video Engine • dev by iq4u8</title>
+    <title>Beats Stream — Next-Gen Audio & Video Demuxing Engine • dev by iq4u8</title>
     <meta name="description" content="Ultra-fast YouTube audio & video streaming backend engineered for Telegram music bots, web applications, and media nodes. dev by iq4u8.">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-primary: #030712;
-            --bg-secondary: #0b0f19;
-            --bg-card: rgba(17, 24, 39, 0.75);
+            --bg-base: #02040a;
+            --bg-card: rgba(13, 18, 30, 0.78);
+            --bg-glass: rgba(18, 24, 42, 0.6);
             --border: rgba(255, 255, 255, 0.08);
-            --border-glow: rgba(99, 102, 241, 0.4);
+            --border-glow: rgba(99, 102, 241, 0.45);
             --accent-primary: #6366f1;
-            --accent-hover: #4f46e5;
             --accent-cyan: #38bdf8;
             --accent-emerald: #10b981;
             --accent-pink: #ec4899;
+            --accent-amber: #f59e0b;
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
@@ -37,16 +37,76 @@
 
         body {
             font-family: var(--font-body);
-            background-color: var(--bg-primary);
+            background-color: var(--bg-base);
             color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.6;
             overflow-x: hidden;
             background-image: 
-                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 50%),
-                radial-gradient(at 50% 100%, rgba(168, 85, 247, 0.08) 0px, transparent 50%);
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.18) 0px, transparent 45%),
+                radial-gradient(at 100% 0%, rgba(56, 189, 248, 0.16) 0px, transparent 45%),
+                radial-gradient(at 50% 60%, rgba(139, 92, 246, 0.1) 0px, transparent 55%),
+                radial-gradient(at 80% 100%, rgba(16, 185, 129, 0.12) 0px, transparent 50%);
             background-attachment: fixed;
+        }
+
+        /* Ambient scanlines grid */
+        .scanlines {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 38, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 6px 100%;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.6;
+        }
+
+        /* Top Morse Code Ticker */
+        .morse-ticker {
+            background: rgba(8, 12, 22, 0.95);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+            padding: 0.4rem 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: #818cf8;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            overflow: hidden;
+            position: relative;
+            z-index: 101;
+        }
+
+        .morse-text {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            white-space: nowrap;
+        }
+
+        .morse-dot {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #38bdf8;
+            margin: 0 1px;
+            animation: morse-blink 1.2s infinite;
+        }
+
+        .morse-dash {
+            display: inline-block;
+            width: 12px;
+            height: 3px;
+            border-radius: 2px;
+            background: #6366f1;
+            margin: 0 1px;
+            animation: morse-blink 1.8s infinite;
+        }
+
+        @keyframes morse-blink {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; filter: drop-shadow(0 0 4px #38bdf8); }
         }
 
         /* Navbar */
@@ -54,7 +114,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 2rem;
+            padding: 1rem 2.5rem;
             backdrop-filter: blur(20px);
             background: rgba(3, 7, 18, 0.85);
             border-bottom: 1px solid var(--border);
@@ -66,21 +126,26 @@
         .logo-wrap {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.9rem;
             text-decoration: none;
             color: var(--text-primary);
         }
 
+        .logo-glow-box {
+            position: relative;
+            width: 44px;
+            height: 44px;
+        }
+
         .logo-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
+            width: 100%;
+            height: 100%;
+            border-radius: 14px;
             background: linear-gradient(135deg, var(--accent-primary), var(--accent-cyan));
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.3rem;
-            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45);
         }
 
         .logo-text-group {
@@ -90,7 +155,7 @@
 
         .logo-text {
             font-family: var(--font-display);
-            font-size: 1.3rem;
+            font-size: 1.35rem;
             font-weight: 800;
             letter-spacing: -0.02em;
             background: linear-gradient(135deg, #ffffff 40%, #a5b4fc 100%);
@@ -99,11 +164,14 @@
         }
 
         .logo-sub {
-            font-size: 0.7rem;
+            font-size: 0.72rem;
             font-family: var(--font-mono);
             color: var(--accent-cyan);
-            font-weight: 600;
-            letter-spacing: 0.05em;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
         }
 
         .nav-actions {
@@ -119,7 +187,7 @@
             gap: 0.5rem;
             font-size: 0.8rem;
             font-family: var(--font-mono);
-            padding: 0.4rem 0.85rem;
+            padding: 0.42rem 0.9rem;
             border-radius: 999px;
             background: rgba(16, 185, 129, 0.12);
             border: 1px solid rgba(16, 185, 129, 0.3);
@@ -145,96 +213,104 @@
         .dev-badge {
             font-size: 0.8rem;
             font-family: var(--font-mono);
-            padding: 0.4rem 0.95rem;
+            padding: 0.42rem 1rem;
             border-radius: 999px;
-            background: rgba(99, 102, 241, 0.15);
-            border: 1px solid rgba(99, 102, 241, 0.4);
-            color: #a5b4fc;
+            background: rgba(99, 102, 241, 0.18);
+            border: 1px solid rgba(99, 102, 241, 0.45);
+            color: #c7d2fe;
             font-weight: 700;
             text-decoration: none;
-            transition: all 0.2s ease;
+            transition: all 0.25s ease;
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.45rem;
         }
 
         .dev-badge:hover {
-            background: rgba(99, 102, 241, 0.3);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+            background: rgba(99, 102, 241, 0.35);
+            border-color: #818cf8;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
         }
 
         /* Container */
         .container {
-            max-width: 1200px;
+            max-width: 1240px;
             margin: 0 auto;
             padding: 3rem 1.5rem 5rem 1.5rem;
+            position: relative;
+            z-index: 10;
         }
 
-        /* Hero */
+        /* Hero Section */
         .hero {
-            text-align: center;
-            margin-bottom: 3.5rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 3rem;
+            align-items: center;
+            margin-bottom: 4rem;
+        }
+
+        @media (min-width: 992px) {
+            .hero {
+                grid-template-columns: 1.15fr 0.85fr;
+            }
         }
 
         .hero-pill {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            font-size: 0.82rem;
+            gap: 0.6rem;
+            font-size: 0.8rem;
             font-family: var(--font-mono);
-            padding: 0.35rem 1.15rem;
+            padding: 0.4rem 1.25rem;
             border-radius: 999px;
             background: rgba(56, 189, 248, 0.1);
             border: 1px solid rgba(56, 189, 248, 0.3);
             color: #7dd3fc;
-            margin-bottom: 1.25rem;
+            margin-bottom: 1.5rem;
             font-weight: 600;
         }
 
         .hero h1 {
             font-family: var(--font-display);
-            font-size: clamp(2.4rem, 5vw, 3.6rem);
-            font-weight: 800;
-            line-height: 1.15;
-            margin-bottom: 1rem;
-            letter-spacing: -0.03em;
-            background: linear-gradient(135deg, #ffffff 40%, #cbd5e1 100%);
+            font-size: clamp(2.4rem, 5vw, 4rem);
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.035em;
+            background: linear-gradient(135deg, #ffffff 40%, #cbd5e1 80%, #818cf8 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .hero p {
             color: var(--text-secondary);
-            font-size: 1.1rem;
-            max-width: 760px;
-            margin: 0 auto 2rem auto;
-            line-height: 1.7;
+            font-size: 1.12rem;
+            max-width: 620px;
+            margin-bottom: 2rem;
+            line-height: 1.75;
         }
 
-        /* Clean Feature Tags Grid */
+        /* Feature Tags Grid */
         .feature-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 0.75rem;
-            max-width: 900px;
-            margin: 0 auto;
         }
 
         .feature-tag {
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             font-family: var(--font-mono);
-            padding: 0.6rem 0.9rem;
+            padding: 0.65rem 0.95rem;
             border-radius: 12px;
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid var(--border);
             color: var(--text-secondary);
-            text-align: center;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            transition: all 0.2s ease;
+            gap: 0.6rem;
+            transition: all 0.25s ease;
         }
 
         .feature-tag:hover {
@@ -244,12 +320,200 @@
             transform: translateY(-2px);
         }
 
-        /* Two Column Grid */
+        /* ═══ MODERN ANIMATED SVG CYBER DECK ═══ */
+        .cyber-deck {
+            position: relative;
+            background: var(--bg-card);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(99, 102, 241, 0.1);
+            backdrop-filter: blur(20px);
+            overflow: hidden;
+        }
+
+        .cyber-deck-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .deck-badge {
+            font-size: 0.72rem;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            color: #38bdf8;
+            padding: 0.25rem 0.65rem;
+            border-radius: 6px;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        /* SVG Holographic Ring & Morse Radar */
+        .svg-radar-container {
+            width: 100%;
+            height: 240px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .radar-svg {
+            width: 230px;
+            height: 230px;
+        }
+
+        /* Live Waveform Audio Bars */
+        .spectrum-bar-wrap {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 4px;
+            height: 48px;
+            margin-top: 1.5rem;
+            padding: 0 1rem;
+        }
+
+        .spec-bar {
+            width: 5px;
+            border-radius: 3px;
+            background: linear-gradient(to top, #6366f1, #38bdf8, #10b981);
+            animation: pulse-spec 1.2s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse-spec {
+            0% { height: 8px; opacity: 0.4; }
+            100% { height: 42px; opacity: 1; filter: drop-shadow(0 0 6px #38bdf8); }
+        }
+
+        /* ═══ INTERACTIVE LIVE STREAM TESTER ═══ */
+        .stream-tester-card {
+            background: linear-gradient(135deg, rgba(17, 24, 39, 0.85) 0%, rgba(9, 13, 22, 0.95) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 3.5rem;
+            box-shadow: 0 16px 50px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+
+        .tester-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .tester-title {
+            font-family: var(--font-display);
+            font-size: 1.35rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            color: #ffffff;
+        }
+
+        .tester-input-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .tester-input {
+            flex: 1;
+            min-width: 260px;
+            background: #030712;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.85rem 1.25rem;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            color: #ffffff;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .tester-input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.25);
+        }
+
+        .tester-btn {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-cyan));
+            border: none;
+            color: #ffffff;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 0.85rem;
+            padding: 0.85rem 1.5rem;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tester-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+        }
+
+        .tester-presets {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .preset-pill {
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            padding: 0.35rem 0.75rem;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .preset-pill:hover {
+            color: #38bdf8;
+            border-color: #38bdf8;
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        .audio-player-box {
+            margin-top: 1.5rem;
+            background: #030712;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .audio-player-box audio {
+            width: 100%;
+            height: 40px;
+            outline: none;
+        }
+
+        /* ═══ TWO COLUMN GRID FOR DOCS ═══ */
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr;
             gap: 2rem;
-            margin-top: 3rem;
+            margin-top: 2rem;
         }
 
         @media (min-width: 960px) {
@@ -262,8 +526,8 @@
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 2rem;
+            border-radius: 22px;
+            padding: 2.2rem;
             backdrop-filter: blur(16px);
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
             transition: border-color 0.25s ease, transform 0.25s ease;
@@ -278,7 +542,7 @@
         .card-title {
             font-family: var(--font-display);
             font-size: 1.35rem;
-            font-weight: 700;
+            font-weight: 800;
             display: flex;
             align-items: center;
             gap: 0.6rem;
@@ -291,7 +555,7 @@
             background: #030712;
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 14px;
-            padding: 1.1rem 1.25rem;
+            padding: 1.15rem 1.25rem;
             overflow-x: auto;
             font-family: var(--font-mono);
             font-size: 0.83rem;
@@ -339,15 +603,15 @@
             background: linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.8) 100%);
             border: 1px solid rgba(56, 189, 248, 0.25);
             border-radius: 20px;
-            padding: 2rem;
-            margin-top: 2.5rem;
+            padding: 2.2rem;
+            margin-top: 3rem;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
         }
 
         .cookie-step {
             display: flex;
             align-items: flex-start;
-            gap: 1rem;
+            gap: 1.25rem;
             margin-top: 1.25rem;
         }
 
@@ -391,7 +655,7 @@
             border-top: 1px solid var(--border);
             color: var(--text-muted);
             font-size: 0.9rem;
-            background: rgba(3, 7, 18, 0.6);
+            background: rgba(3, 7, 18, 0.7);
         }
 
         footer strong {
@@ -414,7 +678,7 @@
             justify-content: center;
             align-items: center;
             gap: 1.5rem;
-            margin-top: 0.75rem;
+            margin-top: 0.85rem;
             font-family: var(--font-mono);
             font-size: 0.82rem;
         }
@@ -422,13 +686,49 @@
 </head>
 <body>
 
-    <!-- Navigation -->
+    <div class="scanlines"></div>
+
+    <!-- ═══ TOP MORSE CODE TICKER ═══ -->
+    <div class="morse-ticker">
+        <div class="morse-text">
+            <span>[BEATS_STREAM_TELEMETRY]</span>
+            <span>
+                <span class="morse-dot"></span><span class="morse-dot"></span><span class="morse-dash"></span>
+                <span class="morse-dot"></span><span class="morse-dash"></span>
+                <span class="morse-dash"></span><span class="morse-dot"></span><span class="morse-dot"></span>
+            </span>
+            <span>BEATX_CORE_V2.4</span>
+            <span>•</span>
+            <span style="color: #38bdf8;">OPUS_48KHZ_DEMUX</span>
+            <span>•</span>
+            <span style="color: #10b981;">LATENCY: 22MS</span>
+        </div>
+        <div style="font-weight: 700; color: #a5b4fc;">
+            DEV: @IQ4U8
+        </div>
+    </div>
+
+    <!-- ═══ NAVIGATION ═══ -->
     <nav>
         <a href="/" class="logo-wrap">
-            <div class="logo-icon">⚡</div>
+            <div class="logo-glow-box">
+                <div class="logo-icon">
+                    <!-- Futuristic Animated SVG Pulse Icon -->
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="10" stroke="#ffffff" stroke-width="2" stroke-dasharray="4 4">
+                            <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="10s" repeatCount="indefinite"/>
+                        </circle>
+                        <path d="M7 12L10 8L14 16L17 12" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+            </div>
             <div class="logo-text-group">
                 <span class="logo-text">Beats Stream</span>
-                <span class="logo-sub">ENGINE CORE • DEV BY IQ4U8</span>
+                <span class="logo-sub">
+                    <span>AUDIO DEMUX ENGINE</span>
+                    <span>•</span>
+                    <span style="color: #818cf8;">DEV BY IQ4U8</span>
+                </span>
             </div>
         </a>
         <div class="nav-actions">
@@ -451,33 +751,175 @@
         </div>
     </nav>
 
-    <!-- Main Container -->
+    <!-- ═══ MAIN CONTENT ═══ -->
     <div class="container">
 
-        <!-- Hero Section -->
+        <!-- ═══ HERO SECTION ═══ -->
         <div class="hero">
-            <div class="hero-pill">⚡ High-Performance Audio & Video Demuxing Engine</div>
-            <h1>Beats Stream API</h1>
-            <p>Direct low-latency audio streaming, YouTube track demuxing, and lossless media delivery built specifically for Telegram music bots (BeatxMusic / PyTgCalls), Discord voice stages, and modern web applications. Zero database, zero login barrier.</p>
-            
-            <div class="feature-grid">
-                <div class="feature-tag">🤖 Telegram Bot Ready</div>
-                <div class="feature-tag">📱 Web & App Streaming</div>
-                <div class="feature-tag">⚡ Sub-40ms Start Times</div>
-                <div class="feature-tag">🎧 320kbps Lossless Opus</div>
-                <div class="feature-tag">🍪 Dynamic Cookie Pool</div>
-                <div class="feature-tag">🔄 Multi-Strategy Fallback</div>
+            <div>
+                <div class="hero-pill">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    <span>Sub-40ms Neural Audio Demuxing Pipeline</span>
+                </div>
+                <h1>Beats Stream Engine</h1>
+                <p>
+                    Ultra-fast media demuxing backend purpose-built for Telegram music bots (<code style="color: #38bdf8; background: rgba(56,189,248,0.1); padding: 0.1rem 0.35rem; border-radius: 4px;">libntgcalls / PyTgCalls</code>), Discord audio nodes, and web media players. Direct streaming with zero transcoding bottleneck.
+                </p>
+                <div class="feature-grid">
+                    <div class="feature-tag">🤖 Telegram Bot Native</div>
+                    <div class="feature-tag">📱 Web & App Streaming</div>
+                    <div class="feature-tag">⚡ Sub-40ms Start Times</div>
+                    <div class="feature-tag">🎧 320kbps Lossless Opus</div>
+                    <div class="feature-tag">🍪 Dynamic Cookie Pool</div>
+                    <div class="feature-tag">🔄 Multi-Strategy Fallback</div>
+                </div>
+            </div>
+
+            <!-- ═══ ANIMATED CYBER ACOUSTIC DECK SVG ═══ -->
+            <div class="cyber-deck">
+                <div class="cyber-deck-header">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
+                        <span style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: #f8fafc;">
+                            TELEMETRY DECK
+                        </span>
+                    </div>
+                    <span class="deck-badge">dev by iq4u8</span>
+                </div>
+
+                <!-- Animated Concentric Radar SVG -->
+                <div class="svg-radar-container">
+                    <svg class="radar-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Outer Orbit Rings -->
+                        <circle cx="100" cy="100" r="90" stroke="rgba(99, 102, 241, 0.2)" stroke-width="1.5" stroke-dasharray="6 6">
+                            <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="20s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="100" cy="100" r="74" stroke="rgba(56, 189, 248, 0.3)" stroke-width="1.5" stroke-dasharray="12 4">
+                            <animateTransform attributeName="transform" type="rotate" from="360 100 100" to="0 100 100" dur="15s" repeatCount="indefinite"/>
+                        </circle>
+                        
+                        <!-- Radar Sweep Scanner -->
+                        <path d="M100 100 L180 100 A80 80 0 0 0 156 44 Z" fill="url(#radarSweep)" opacity="0.35">
+                            <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="3s" repeatCount="indefinite"/>
+                        </path>
+
+                        <!-- Middle Ring -->
+                        <circle cx="100" cy="100" r="50" stroke="rgba(16, 185, 129, 0.35)" stroke-width="2"/>
+
+                        <!-- Center Vinyl Core -->
+                        <circle cx="100" cy="100" r="32" fill="#090d16" stroke="#6366f1" stroke-width="2"/>
+                        <circle cx="100" cy="100" r="14" fill="url(#coreGrad)"/>
+                        <circle cx="100" cy="100" r="4" fill="#ffffff"/>
+
+                        <!-- Waveform Nodes -->
+                        <circle cx="100" cy="26" r="3" fill="#38bdf8">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="174" cy="100" r="3" fill="#6366f1">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.2s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="100" cy="174" r="3" fill="#10b981">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.8s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="26" cy="100" r="3" fill="#ec4899">
+                            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.4s" repeatCount="indefinite"/>
+                        </circle>
+
+                        <defs>
+                            <radialGradient id="radarSweep" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(100 100) rotate(45) scale(80)">
+                                <stop stop-color="#38bdf8" stop-opacity="0.8"/>
+                                <stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
+                            </radialGradient>
+                            <linearGradient id="coreGrad" x1="86" y1="86" x2="114" y2="114" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#6366f1"/>
+                                <stop offset="1" stop-color="#38bdf8"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+
+                <!-- Morse Code frequency stream line -->
+                <div style="text-align: center; margin-top: 0.5rem; font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8;">
+                    <span>MORSE FREQ: </span>
+                    <span style="color: #38bdf8; font-weight: 700;">-··· · ·- - ··· / ··· - ·-· · ·- --</span>
+                </div>
+
+                <!-- Animated Spectrum Bars -->
+                <div class="spectrum-bar-wrap">
+                    <div class="spec-bar" style="animation-delay: 0.05s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.15s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.25s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.35s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.45s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.55s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.65s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.75s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.85s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.95s;"></div>
+                    <div class="spec-bar" style="animation-delay: 1.05s;"></div>
+                    <div class="spec-bar" style="animation-delay: 1.15s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.2s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.4s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.6s;"></div>
+                    <div class="spec-bar" style="animation-delay: 0.8s;"></div>
+                    <div class="spec-bar" style="animation-delay: 1.0s;"></div>
+                </div>
             </div>
         </div>
 
-        <!-- GRID: ENDPOINTS & BOT/APP EXAMPLES -->
+        <!-- ═══ INTERACTIVE LIVE STREAM TESTER ═══ -->
+        <div class="stream-tester-card">
+            <div class="tester-header">
+                <div class="tester-title">
+                    <span>⚡ Live Stream Sandbox</span>
+                    <span style="font-size: 0.75rem; font-family: var(--font-mono); color: #38bdf8; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 6px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56,189,248,0.3);">
+                        DIRECT AUDIO PIPELINE
+                    </span>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 0.75rem; color: #94a3b8;">
+                    Endpoint: <code style="color: #6ee7b7;">GET /download?title={query}&type=audio&stream=1</code>
+                </div>
+            </div>
+
+            <div class="tester-input-group">
+                <input type="text" id="streamInput" class="tester-input" placeholder="Enter song title or YouTube URL (e.g. Tum Hi Ho)..." value="Dil Diyan Gallan">
+                <button type="button" class="tester-btn" onclick="startStreamTest()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>Stream Audio</span>
+                </button>
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="tester-presets">
+                <span style="font-size: 0.75rem; font-family: var(--font-mono); color: #64748b; align-self: center;">Quick Test:</span>
+                <span class="preset-pill" onclick="setPreset('Dil Diyan Gallan')">Dil Diyan Gallan</span>
+                <span class="preset-pill" onclick="setPreset('Tum Hi Ho')">Tum Hi Ho</span>
+                <span class="preset-pill" onclick="setPreset('Blinding Lights')">Blinding Lights</span>
+                <span class="preset-pill" onclick="setPreset('Chill Lofi Beats')">Chill Lofi Beats</span>
+            </div>
+
+            <!-- HTML5 Audio Stream Player -->
+            <div id="playerBox" class="audio-player-box" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 0.8rem;">
+                    <span id="playingTitle" style="color: #38bdf8; font-weight: 700;">Streaming: Dil Diyan Gallan</span>
+                    <span style="color: #10b981;">⚡ Live Edge Pipeline</span>
+                </div>
+                <audio id="audioPlayer" controls autoplay></audio>
+            </div>
+        </div>
+
+        <!-- ═══ GRID: ENDPOINTS & BOT/APP EXAMPLES ═══ -->
         <div class="grid-2">
             
             <!-- API Endpoints -->
             <div class="card">
                 <div class="card-title">📡 Direct API Endpoints</div>
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.25rem;">
-                    Integrate directly into your bot client or frontend application:
+                    Production endpoints ready for high-concurrency Telegram bots and web media apps:
                 </p>
 
                 <div class="endpoint-label">
@@ -562,7 +1004,7 @@ audio.play();</code></pre>
 
         </div>
 
-        <!-- COOKIE ENVIRONMENT HANDOVER GUIDE -->
+        <!-- ═══ COOKIE ENVIRONMENT GUIDE ═══ -->
         <div class="cookie-card">
             <div class="card-title" style="color: #38bdf8; margin-bottom: 0.5rem;">
                 🍪 Plug & Play Cookie & Anti-Ban Architecture
@@ -597,9 +1039,9 @@ audio.play();</code></pre>
     <!-- Toast Notification -->
     <div id="toast" class="toast">Snippet copied to clipboard!</div>
 
-    <!-- Footer -->
+    <!-- ═══ FOOTER ═══ -->
     <footer>
-        <p><strong>Beats Stream</strong> • High-Performance Audio Engine • <strong>dev by iq4u8</strong></p>
+        <p><strong>Beats Stream</strong> • Next-Gen Audio Demuxing Core • <strong>dev by iq4u8</strong></p>
         <div class="footer-socials">
             <span>Telegram: <a href="https://t.me/iq4u8" target="_blank">@iq4u8</a></span>
             <span>•</span>
@@ -624,6 +1066,31 @@ audio.play();</code></pre>
             navigator.clipboard.writeText(text).then(() => {
                 showToast("Snippet copied to clipboard!");
             });
+        }
+
+        function setPreset(val) {
+            document.getElementById('streamInput').value = val;
+            startStreamTest();
+        }
+
+        function startStreamTest() {
+            const query = document.getElementById('streamInput').value.trim();
+            if (!query) {
+                showToast("Please enter a song title!");
+                return;
+            }
+            const streamUrl = `/download?title=${encodeURIComponent(query)}&type=audio&stream=1`;
+            const playerBox = document.getElementById('playerBox');
+            const audioPlayer = document.getElementById('audioPlayer');
+            const playingTitle = document.getElementById('playingTitle');
+
+            playingTitle.textContent = `Streaming: ${query}`;
+            audioPlayer.src = streamUrl;
+            playerBox.style.display = 'flex';
+            audioPlayer.play().catch(e => {
+                console.log("Auto-play blocked or waiting for user interaction:", e);
+            });
+            showToast(`Loading stream for: ${query}`);
         }
     </script>
 </body>
