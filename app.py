@@ -641,7 +641,8 @@ def home():
         'index.html',
         made_by="dev by iq4u8",
         cookies_available=has_cookies,
-        require_api_key=REQUIRE_API_KEY
+        require_api_key=REQUIRE_API_KEY,
+        client_api_key=API_KEY if REQUIRE_API_KEY else ""
     )
 
 
