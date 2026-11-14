@@ -306,17 +306,20 @@ def _extract_and_download(video_url, base_opts):
 
     if cookie_file:
         strategies = [
+            {'player_client': ['ios', 'android', 'web_creator', 'mweb'], 'cookiefile': cookie_file},
+            {'player_client': ['ios', 'android', 'mweb']},
             {'player_client': ['web_embedded'], 'cookiefile': cookie_file},
-            {'cookiefile': cookie_file},
-            {'player_client': ['android', 'ios']},
-            {'player_client': ['web', 'mweb'], 'cookiefile': cookie_file},
+            {'player_client': ['android']},
+            {'player_client': ['ios']},
         ]
     else:
         # Seamless public fallback when cookies are not provided
         strategies = [
+            {'player_client': ['ios', 'android', 'web_creator', 'mweb']},
             {'player_client': ['android', 'ios']},
             {'player_client': ['web_embedded']},
-            {'player_client': ['web', 'mweb']},
+            {'player_client': ['android']},
+            {'player_client': ['ios']},
         ]
 
     last_error = None
@@ -358,7 +361,7 @@ def download_audio(video_url):
     unique_id = str(uuid.uuid4())
     output_template = os.path.join(TEMP_DOWNLOAD_DIR, f"{unique_id}.%(ext)s")
     base_opts = {
-        'format': 'bestaudio/best',
+        'format': 'bestaudio/best[height<=480]/best',
         'outtmpl': output_template,
         'noplaylist': True,
         'quiet': True,
@@ -370,7 +373,7 @@ def download_audio(video_url):
     # Embed metadata so that artist and comment tag are 'Made by Yuvi'
     if shutil.which('ffmpeg'):
         base_opts['postprocessors'] = [
-            {'key': 'FFmpegExtractAudio'},
+            {'key': 'FFmpegExtractAudio', 'preferredcodec': 'm4a'},
             {'key': 'FFmpegMetadata', 'add_metadata': True},
         ]
         base_opts['postprocessor_args'] = {
