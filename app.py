@@ -270,15 +270,26 @@ def check_cache_size_and_cleanup(preserve_paths=None):
                     print(f"[Made by Yuvi] Error deleting file {file_path}: {e}")
 
 
+import re
+
 def normalize_video_url(url):
     """
-    Accepts full YouTube URL or bare video ID and returns full watch URL.
-    Made by Yuvi
+    Accepts full YouTube URL, bare 11-char video ID, or search query.
+    If it's not a direct URL and not an 11-character ID, auto-resolve via search!
     """
     if not url:
         return url
+    url = url.strip()
     if url.startswith("http://") or url.startswith("https://"):
         return url
+    if re.match(r'^[a-zA-Z0-9_-]{11}$', url):
+        return f"https://www.youtube.com/watch?v={url}"
+    
+    # Auto-resolve search query if query string passed in url param (e.g. manohari-telugu-hindi)
+    cleaned_query = url.replace("-", " ").replace("_", " ")
+    resolved = resolve_title_to_video_info(cleaned_query)
+    if resolved and 'url' in resolved:
+        return resolved['url']
     return f"https://www.youtube.com/watch?v={url}"
 
 
@@ -576,6 +587,24 @@ def download_endpoint():
                     os.remove(file_path)
                 except Exception as cleanup_error:
                     print(f"[Made by Yuvi] Cleanup note {file_path}: {cleanup_error}")
+
+
+@app.route('/api/song', methods=['GET'])
+def api_song_endpoint():
+    """BabyAPI and Song URL alias endpoint"""
+    target = request.args.get('query') or request.args.get('url') or request.args.get('title')
+    if not target:
+        return jsonify({"error": "Missing query or url parameter"}), 400
+    return download_endpoint()
+
+
+@app.route('/api/video', methods=['GET'])
+def api_video_endpoint():
+    """BabyAPI Video URL alias endpoint"""
+    target = request.args.get('query') or request.args.get('url') or request.args.get('title')
+    if not target:
+        return jsonify({"error": "Missing query or url parameter"}), 400
+    return download_endpoint()
 
 
 @app.route('/')
