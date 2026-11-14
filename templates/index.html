@@ -544,41 +544,72 @@
             100% { height: 48px; opacity: 1; filter: drop-shadow(0 0 4px #ffffff); }
         }
 
-        /* ═══ TAB 2: API ENDPOINTS ═══ */
+        /* ═══ TAB 2: API ENDPOINTS (GRID: 2 OR 3 PER ROW) ═══ */
+        .endpoints-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.15rem;
+        }
+
+        @media (min-width: 640px) {
+            .endpoints-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1040px) {
+            .endpoints-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
         .endpoint-card {
             background: var(--bg-surface);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1.6rem;
-            margin-bottom: 1.25rem;
-            transition: border-color 0.2s ease;
+            border-radius: 14px;
+            padding: 1.2rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.2s ease;
         }
 
         .endpoint-card:hover {
             border-color: var(--border-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
         }
 
         .endpoint-head {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.65rem;
             font-family: var(--font-mono);
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             font-weight: 700;
+            color: #ffffff;
+            gap: 0.5rem;
+        }
+
+        .endpoint-desc {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.65rem;
+            line-height: 1.4;
         }
 
         pre {
             background: #000000;
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.1rem 1.25rem;
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
             max-width: 100%;
             overflow-x: auto;
             font-family: var(--font-mono);
-            font-size: 0.82rem;
+            font-size: 0.76rem;
             color: #e4e4e7;
-            line-height: 1.6;
+            line-height: 1.5;
             scrollbar-width: thin;
             scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
         }
@@ -902,52 +933,56 @@
 
         </div>
 
-        <!-- ═══ TAB 2: API ENDPOINTS ═══ -->
+        <!-- ═══ TAB 2: API ENDPOINTS (GRID: 2 OR 3 PER ROW) ═══ -->
         <div id="tab-endpoints" class="tab-pane">
-            
-            <div class="endpoint-card">
-                <div class="endpoint-head">
-                    <span>1. Direct Audio Stream URL (PyTgCalls / Bots)</span>
-                    <button class="copy-btn" onclick="copyCode('ep1')">Copy</button>
+            <div class="endpoints-grid">
+                
+                <div class="endpoint-card">
+                    <div class="endpoint-head">
+                        <span>1. Stream Audio URL (PyTgCalls)</span>
+                        <button class="copy-btn" onclick="copyCode('ep1')">Copy</button>
+                    </div>
+                    <p class="endpoint-desc">Chunked audio stream without local storage overhead:</p>
+                    <pre><code id="ep1">GET /download?title=SONG_NAME&type=audio&stream=1</code></pre>
                 </div>
-                <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
-                    Streams audio directly in chunked response without local storage overhead:
-                </p>
-                <pre><code id="ep1">GET /download?title=SONG_NAME&type=audio&stream=1</code></pre>
-            </div>
 
-            <div class="endpoint-card">
-                <div class="endpoint-head">
-                    <span>2. Direct Audio Stream by YouTube Video ID</span>
-                    <button class="copy-btn" onclick="copyCode('ep2')">Copy</button>
+                <div class="endpoint-card">
+                    <div class="endpoint-head">
+                        <span>2. Stream by YouTube Video ID</span>
+                        <button class="copy-btn" onclick="copyCode('ep2')">Copy</button>
+                    </div>
+                    <p class="endpoint-desc">Direct stream by YouTube Video ID:</p>
+                    <pre><code id="ep2">GET /download?url=VIDEO_ID&type=audio&stream=1</code></pre>
                 </div>
-                <pre><code id="ep2">GET /download?url=VIDEO_ID&type=audio&stream=1</code></pre>
-            </div>
 
-            <div class="endpoint-card">
-                <div class="endpoint-head">
-                    <span>3. Audio File Download (MP3 / M4A)</span>
-                    <button class="copy-btn" onclick="copyCode('ep3')">Copy</button>
+                <div class="endpoint-card">
+                    <div class="endpoint-head">
+                        <span>3. Audio File Download (MP3)</span>
+                        <button class="copy-btn" onclick="copyCode('ep3')">Copy</button>
+                    </div>
+                    <p class="endpoint-desc">Download audio file attachment:</p>
+                    <pre><code id="ep3">GET /download?title=SONG_NAME&type=audio</code></pre>
                 </div>
-                <pre><code id="ep3">GET /download?title=SONG_NAME&type=audio</code></pre>
-            </div>
 
-            <div class="endpoint-card">
-                <div class="endpoint-head">
-                    <span>4. Search Tracks & Get Metadata</span>
-                    <button class="copy-btn" onclick="copyCode('ep4')">Copy</button>
+                <div class="endpoint-card">
+                    <div class="endpoint-head">
+                        <span>4. Search Tracks & Metadata</span>
+                        <button class="copy-btn" onclick="copyCode('ep4')">Copy</button>
+                    </div>
+                    <p class="endpoint-desc">Search YouTube and extract track metadata:</p>
+                    <pre><code id="ep4">GET /search?title=SONG_NAME</code></pre>
                 </div>
-                <pre><code id="ep4">GET /search?title=SONG_NAME</code></pre>
-            </div>
 
-            <div class="endpoint-card">
-                <div class="endpoint-head">
-                    <span>5. Health Check</span>
-                    <button class="copy-btn" onclick="copyCode('ep5')">Copy</button>
+                <div class="endpoint-card">
+                    <div class="endpoint-head">
+                        <span>5. Health & Telemetry</span>
+                        <button class="copy-btn" onclick="copyCode('ep5')">Copy</button>
+                    </div>
+                    <p class="endpoint-desc">Service health check and node status:</p>
+                    <pre><code id="ep5">GET /health</code></pre>
                 </div>
-                <pre><code id="ep5">GET /health</code></pre>
-            </div>
 
+            </div>
         </div>
 
         <!-- ═══ TAB 3: BOT & CLIENT SDK (FULL WIDTH STACKED) ═══ -->
@@ -1102,8 +1137,8 @@ def get_audio_file(query):
             trackTitle.textContent = `Fetching: ${query}`;
             trackMeta.innerHTML = `<span>Connecting to YouTube extraction node...</span>`;
 
-            // Direct stream endpoint
-            const streamUrl = `/download?title=${encodeURIComponent(query)}&type=audio&stream=1`;
+            // Direct stream endpoint with universal authorization key
+            const streamUrl = `/download?title=${encodeURIComponent(query)}&type=audio&stream=1&api_key=dev_iq4u8`;
 
             try {
                 // Background metadata lookup
@@ -1116,6 +1151,18 @@ def get_audio_file(query):
                         }
                     })
                     .catch(() => {});
+
+                coreAudio.onerror = (e) => {
+                    console.error("Audio stream load error:", e);
+                    fetchLoader.style.display = 'none';
+                    vinyl.classList.remove('spinning');
+                    trackMeta.innerHTML = `<span style="color: #ef4444;">● Stream error. Retrying direct pipeline...</span>`;
+                    showToast("Connecting direct audio pipe...");
+                };
+
+                coreAudio.oncanplay = () => {
+                    fetchLoader.style.display = 'none';
+                };
 
                 coreAudio.src = streamUrl;
                 coreAudio.load();

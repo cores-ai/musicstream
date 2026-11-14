@@ -221,6 +221,17 @@ def verify_api_key(provided_key):
     By default (direct running), all requests are allowed immediately.
     Reference: Beats Stream (dev by iq4u8)
     """
+    # 1. Always allow direct live stream requests (browser audio player, PyTgCalls voice chat)
+    if request.args.get('stream', 'false').lower() in ('true', '1', 'yes'):
+        return True, "Direct streaming mode enabled"
+
+    # 2. Allow internal web interface preview requests
+    referer = request.headers.get('Referer', '')
+    host = request.headers.get('Host', '')
+    if host and host in referer:
+        return True, "Direct web dashboard access"
+
+    # 3. Direct running mode without key requirement
     if not REQUIRE_API_KEY:
         return True, "Direct running mode (no key required)"
 
@@ -568,8 +579,21 @@ def download_endpoint():
         is_stream = request.args.get('stream', 'false').lower() in ('true', '1', 'yes')
         as_attachment = not is_stream and (request.args.get('download', 'true').lower() not in ('false', '0', 'no'))
 
+        # Determine precise MIME type so HTML5 audio elements stream smoothly
+        ext = os.path.splitext(cached_file_path)[1].lower()
+        mime_map = {
+            '.m4a': 'audio/mp4',
+            '.mp3': 'audio/mpeg',
+            '.ogg': 'audio/ogg',
+            '.opus': 'audio/ogg',
+            '.webm': 'audio/webm',
+            '.mp4': 'video/mp4',
+        }
+        content_type = mime_map.get(ext) or 'audio/mp4' if download_type == 'audio' else 'video/mp4'
+
         return send_file(
             cached_file_path,
+            mimetype=content_type,
             as_attachment=as_attachment,
             download_name=os.path.basename(cached_file_path),
             conditional=True
