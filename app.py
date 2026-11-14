@@ -84,31 +84,16 @@ def get_js_runtimes_config():
 def resolve_title_to_video_info(title):
     """
     Search for a video by title.
-    1. Primary: Fast external search worker.
-    2. Fallback: yt-dlp direct YouTube search (guarantees results for all titles, ringtones, etc.).
-    Beats Stream (dev by iq4u8)
+    Fast direct yt-dlp YouTube search with instant fallback.
+    dev by iq4u8
     """
-    # 1. Primary external search API
-    try:
-        encoded_title = requests.utils.quote(title)
-        res = requests.get(SEARCH_API_URL + encoded_title, timeout=6)
-        if res.status_code == 200:
-            data = res.json()
-            if data and 'link' in data:
-                return {
-                    'title': data.get('title', title),
-                    'url': data['link'],
-                    'duration': data.get('duration')
-                }
-    except Exception as e:
-        print(f"[Beats Stream] Primary search worker note: {e}")
-
-    # 2. Resilient fallback via yt-dlp direct search
+    # 1. Primary: Direct yt-dlp search (fast, reliable, no external dependencies)
     try:
         ydl_opts = {
             'quiet': True,
             'extract_flat': True,
             'noplaylist': True,
+            'socket_timeout': 10,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"ytsearch1:{title}", download=False)
@@ -125,7 +110,23 @@ def resolve_title_to_video_info(title):
                     'duration': entry.get('duration')
                 }
     except Exception as e:
-        print(f"[Beats Stream] yt-dlp fallback search error: {e}")
+        print(f"[Beats Stream] Direct search note: {e}")
+
+    # 2. Secondary fallback via external worker if configured
+    if SEARCH_API_URL and SEARCH_API_URL.startswith("http"):
+        try:
+            encoded_title = requests.utils.quote(title)
+            res = requests.get(SEARCH_API_URL + encoded_title, timeout=3)
+            if res.status_code == 200:
+                data = res.json()
+                if data and 'link' in data:
+                    return {
+                        'title': data.get('title', title),
+                        'url': data['link'],
+                        'duration': data.get('duration')
+                    }
+        except Exception:
+            pass
 
     return None
 
