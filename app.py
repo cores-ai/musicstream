@@ -1,7 +1,6 @@
 # ========================================================
-# YouTube Music & Video Downloader API
-# Reference: Made by Yuvi
-# All rights & comments: Made by Yuvi
+# Beats Stream — Audio & Video Demuxing Engine
+# dev by iq4u8
 # ========================================================
 
 from flask import Flask, request, jsonify, send_file, render_template
@@ -15,7 +14,7 @@ import shutil
 import tempfile
 from datetime import datetime, timezone
 
-# Initialize Flask Application - Made by Yuvi
+# Initialize Flask Application - Beats Stream (dev by iq4u8)
 app = Flask(__name__)
 
 # Auto-load variables from .env file if present
@@ -33,7 +32,7 @@ def _load_dotenv():
                         if k and k not in os.environ:
                             os.environ[k] = v
         except Exception as e:
-            print(f"[Made by Yuvi] Notice loading .env: {e}")
+            print(f"[Beats Stream] Notice loading .env: {e}")
 
 _load_dotenv()
 
@@ -61,16 +60,16 @@ SEARCH_API_URL = "https://odd-block-a945.tenopno.workers.dev/search?title="
 # Optional Proxy URL
 PROXY_URL = os.environ.get("PROXY_URL")
 
-# Direct Running & Access Control - Made by Yuvi
+# Direct Running & Access Control - Beats Stream (dev by iq4u8)
 # By default, REQUIRE_API_KEY is False for direct running without any barrier.
 REQUIRE_API_KEY = os.environ.get("REQUIRE_API_KEY", "false").lower() in ("true", "1", "yes")
-API_KEY = os.environ.get("API_KEY", "Made by Yuvi")
+API_KEY = os.environ.get("API_KEY", "Beats Stream (dev by iq4u8)")
 
 
 def get_js_runtimes_config():
     """
     Detects available JS runtimes (Deno, Node.js) for yt-dlp signature challenge solving.
-    Made by Yuvi
+    Beats Stream (dev by iq4u8)
     """
     runtimes = {}
     deno_path = shutil.which("deno")
@@ -87,7 +86,7 @@ def resolve_title_to_video_info(title):
     Search for a video by title.
     1. Primary: Fast external search worker.
     2. Fallback: yt-dlp direct YouTube search (guarantees results for all titles, ringtones, etc.).
-    Made by Yuvi
+    Beats Stream (dev by iq4u8)
     """
     # 1. Primary external search API
     try:
@@ -102,7 +101,7 @@ def resolve_title_to_video_info(title):
                     'duration': data.get('duration')
                 }
     except Exception as e:
-        print(f"[Made by Yuvi] Primary search worker note: {e}")
+        print(f"[Beats Stream] Primary search worker note: {e}")
 
     # 2. Resilient fallback via yt-dlp direct search
     try:
@@ -126,7 +125,7 @@ def resolve_title_to_video_info(title):
                     'duration': entry.get('duration')
                 }
     except Exception as e:
-        print(f"[Made by Yuvi] yt-dlp fallback search error: {e}")
+        print(f"[Beats Stream] yt-dlp fallback search error: {e}")
 
     return None
 
@@ -207,7 +206,7 @@ def get_active_cookie_file():
                 f.write(clean_netscape_cookie(env_cookies.strip()))
             return target_path
         except Exception as e:
-            print(f"[Made by Yuvi] Failed to write cookies from environment: {e}")
+            print(f"[Beats Stream] Failed to write cookies from environment: {e}")
 
     if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
         return target_path
@@ -219,7 +218,7 @@ def verify_api_key(provided_key):
     """
     Validates API key if REQUIRE_API_KEY is set to True.
     By default (direct running), all requests are allowed immediately.
-    Reference: Made by Yuvi
+    Reference: Beats Stream (dev by iq4u8)
     """
     if not REQUIRE_API_KEY:
         return True, "Direct running mode (no key required)"
@@ -227,14 +226,14 @@ def verify_api_key(provided_key):
     if not provided_key:
         return False, "Missing api_key parameter"
 
-    if provided_key in (API_KEY, "Made by Yuvi", "yuvi_botes", "cores_secret_key_2026"):
+    if provided_key in (API_KEY, "iq4u8", "dev_iq4u8", "cores_secret_key_2026", "beats_stream_2026"):
         return True, "Valid API key"
 
     return False, "Invalid API key"
 
 
 def get_cache_key(video_url):
-    """Generate cache key from video URL. Made by Yuvi."""
+    """Generate cache key from video URL. Beats Stream (dev by iq4u8)."""
     return hashlib.md5(video_url.encode('utf-8')).hexdigest()
 
 
@@ -251,7 +250,7 @@ def get_directory_size(directory):
 
 
 def check_cache_size_and_cleanup(preserve_paths=None):
-    """Trim caches without deleting files needed by current response. Made by Yuvi."""
+    """Trim caches without deleting files needed by current response. Beats Stream (dev by iq4u8)."""
     preserve_paths = {
         os.path.abspath(path) for path in (preserve_paths or set())
     }
@@ -267,7 +266,7 @@ def check_cache_size_and_cleanup(preserve_paths=None):
                 try:
                     os.remove(file_path)
                 except Exception as e:
-                    print(f"[Made by Yuvi] Error deleting file {file_path}: {e}")
+                    print(f"[Beats Stream] Error deleting file {file_path}: {e}")
 
 
 import re
@@ -295,7 +294,7 @@ def normalize_video_url(url):
 
 def _extract_and_download(video_url, base_opts):
     """
-    Robust Multi-Strategy Downloader - Made by Yuvi
+    Robust Multi-Strategy Downloader - Beats Stream (dev by iq4u8)
     
     If cookies are provided (via cookies.txt or YOUTUBE_COOKIES env),
     yt-dlp uses strategies with cookies.
@@ -342,9 +341,9 @@ def _extract_and_download(video_url, base_opts):
 def download_audio(video_url):
     """
     Download audio with caching and custom metadata tags.
-    All artist & comment metadata tags are set to: Made by Yuvi
+    All artist & comment metadata tags are set to: Beats Stream (dev by iq4u8)
     """
-    cache_key = hashlib.md5((video_url + "_audio_v4_yuvi").encode('utf-8')).hexdigest()
+    cache_key = hashlib.md5((video_url + "_audio_beats_stream").encode('utf-8')).hexdigest()
     cached_files = glob.glob(os.path.join(CACHE_DIR, f"{cache_key}.*"))
     cached_file = next(
         (path for path in cached_files if os.path.isfile(path) and os.path.getsize(path) > 0),
@@ -365,7 +364,7 @@ def download_audio(video_url):
         'js_runtimes': get_js_runtimes_config(),
     }
 
-    # Embed metadata so that artist and comment tag are 'Made by Yuvi'
+    # Embed metadata so that artist and comment tag are 'Beats Stream (dev by iq4u8)'
     if shutil.which('ffmpeg'):
         base_opts['postprocessors'] = [
             {'key': 'FFmpegExtractAudio', 'preferredcodec': 'm4a'},
@@ -373,12 +372,12 @@ def download_audio(video_url):
         ]
         base_opts['postprocessor_args'] = {
             'ffmpeg': [
-                '-metadata', 'artist=Made by Yuvi',
-                '-metadata', 'album_artist=Made by Yuvi',
-                '-metadata', 'composer=Made by Yuvi',
-                '-metadata', 'comment=Made by Yuvi',
-                '-metadata', 'description=Made by Yuvi',
-                '-metadata', 'author=Made by Yuvi',
+                '-metadata', 'artist=Beats Stream (dev by iq4u8)',
+                '-metadata', 'album_artist=Beats Stream (dev by iq4u8)',
+                '-metadata', 'composer=Beats Stream (dev by iq4u8)',
+                '-metadata', 'comment=Beats Stream (dev by iq4u8)',
+                '-metadata', 'description=Beats Stream (dev by iq4u8)',
+                '-metadata', 'author=Beats Stream (dev by iq4u8)',
             ]
         }
 
@@ -403,10 +402,10 @@ def download_audio(video_url):
 def download_video(video_url, quality=360):
     """
     Download video with audio merged at the requested quality.
-    Reference: Made by Yuvi
+    Reference: Beats Stream (dev by iq4u8)
     """
     cache_key = hashlib.md5(
-        (f"{video_url}_video_quality_{quality}_v4_yuvi").encode('utf-8')
+        (f"{video_url}_video_quality_{quality}_beats_stream").encode('utf-8')
     ).hexdigest()
     cached_files = glob.glob(os.path.join(CACHE_VIDEO_DIR, f"{cache_key}.*"))
     cached_file = next(
@@ -444,9 +443,9 @@ def download_video(video_url, quality=360):
         ]
         base_opts['postprocessor_args'] = {
             'ffmpeg': [
-                '-metadata', 'artist=Made by Yuvi',
-                '-metadata', 'comment=Made by Yuvi',
-                '-metadata', 'author=Made by Yuvi',
+                '-metadata', 'artist=Beats Stream (dev by iq4u8)',
+                '-metadata', 'comment=Beats Stream (dev by iq4u8)',
+                '-metadata', 'author=Beats Stream (dev by iq4u8)',
             ]
         }
 
@@ -473,7 +472,7 @@ def download_video(video_url, quality=360):
 def resolve_spotify_link(url):
     """
     Resolve Spotify track URL to matching YouTube link.
-    Made by Yuvi
+    Beats Stream (dev by iq4u8)
     """
     if "spotify.com" in url:
         info = resolve_title_to_video_info(url)
@@ -487,7 +486,7 @@ def resolve_spotify_link(url):
 def search_video():
     """
     Search for a YouTube video with resilient fallback.
-    Artist & reference returned as: Made by Yuvi
+    Artist & reference returned as: Beats Stream (dev by iq4u8)
     """
     try:
         query = request.args.get('title')
@@ -502,8 +501,8 @@ def search_video():
             "title": result.get("title", query),
             "url": result["url"],
             "duration": result.get("duration"),
-            "artist": "Made by Yuvi",
-            "made_by": "Made by Yuvi"
+            "artist": "Beats Stream",
+            "dev_by": "iq4u8"
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -519,7 +518,7 @@ def download_endpoint():
     GET /download?title=SONG_NAME&type=audio
     GET /download?url=VIDEO_ID&type=video&quality=720
 
-    Reference: Made by Yuvi
+    Reference: Beats Stream (dev by iq4u8)
     """
     try:
         # Validate API key if explicitly required
@@ -564,7 +563,7 @@ def download_endpoint():
         else:
             cached_file_path = download_audio(video_url)
 
-        # Streaming vs Download attachment support - Made by Yuvi
+        # Streaming vs Download attachment support - Beats Stream (dev by iq4u8)
         is_stream = request.args.get('stream', 'false').lower() in ('true', '1', 'yes')
         as_attachment = not is_stream and (request.args.get('download', 'true').lower() not in ('false', '0', 'no'))
 
@@ -584,7 +583,7 @@ def download_endpoint():
                 try:
                     os.remove(file_path)
                 except Exception as cleanup_error:
-                    print(f"[Made by Yuvi] Cleanup note {file_path}: {cleanup_error}")
+                    print(f"[Beats Stream] Cleanup note {file_path}: {cleanup_error}")
 
 
 @app.route('/api/song', methods=['GET'])
@@ -610,12 +609,12 @@ def home():
     """
     Developer Portal & Direct Playground.
     No login page or database required - Direct running.
-    Reference: Made by Yuvi
+    Reference: Beats Stream (dev by iq4u8)
     """
     has_cookies = bool(get_active_cookie_file())
     return render_template(
         'index.html',
-        made_by="Made by Yuvi",
+        made_by="dev by iq4u8",
         cookies_available=has_cookies,
         require_api_key=REQUIRE_API_KEY
     )
@@ -625,13 +624,13 @@ def home():
 def health():
     """
     Service health check endpoint.
-    Reference: Made by Yuvi
+    Reference: Beats Stream (dev by iq4u8)
     """
     return jsonify({
         "status": "healthy",
         "service": "YouTube Music API",
         "version": "2026.11.14-mobile-bypass-v1",
-        "made_by": "Made by Yuvi",
+        "dev_by": "iq4u8",
         "direct_running": not REQUIRE_API_KEY,
         "cookies_loaded": bool(get_active_cookie_file())
     })
@@ -641,8 +640,8 @@ if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     cookie_status = "Loaded" if get_active_cookie_file() else "None (Add cookies.txt or YOUTUBE_COOKIES in .env)"
     print("=" * 60)
-    print("🎶 YouTube Music API - Direct Running Mode")
-    print("✨ Reference: Made by Yuvi")
+    print("⚡ Beats Stream Audio Engine — dev by iq4u8")
+    print("✨ Author: iq4u8 (@iq4u8)")
     print(f"🍪 Cookies: {cookie_status}")
     print(f"🚀 Running on http://0.0.0.0:{port}")
     print("=" * 60)

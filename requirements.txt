@@ -1,5 +1,4 @@
-# YouTube Music API - Requirements
-# Made by Yuvi
+# Beats Stream Engine - dev by iq4u8
 Flask>=3.0.0
 yt-dlp[default]>=2024.1.0
 requests>=2.31.0
