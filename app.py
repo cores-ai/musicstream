@@ -261,8 +261,47 @@ def get_directory_size(directory):
     return total_size
 
 
+import threading
+
+def cleanup_expired_temp_files(max_age_seconds=1500):
+    """
+    Auto-purge cached test tracks older than 20-30 minutes (dev by iq4u8).
+    Keeps test files strictly ephemeral and prevents disk bloat.
+    """
+    now = time.time()
+    for directory in [CACHE_DIR, CACHE_VIDEO_DIR, TEMP_DOWNLOAD_DIR]:
+        if not os.path.exists(directory):
+            continue
+        try:
+            for fname in os.listdir(directory):
+                fpath = os.path.join(directory, fname)
+                if os.path.isfile(fpath):
+                    try:
+                        mtime = os.path.getmtime(fpath)
+                        if (now - mtime) > max_age_seconds:
+                            os.remove(fpath)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+def _start_background_cache_cleaner():
+    def cleaner_worker():
+        while True:
+            try:
+                time.sleep(300)  # Check every 5 minutes
+                cleanup_expired_temp_files(max_age_seconds=1500)  # 25-minute TTL
+            except Exception:
+                pass
+    t = threading.Thread(target=cleaner_worker, daemon=True)
+    t.start()
+
+_start_background_cache_cleaner()
+
+
 def check_cache_size_and_cleanup(preserve_paths=None):
     """Trim caches without deleting files needed by current response. Beats Stream (dev by iq4u8)."""
+    cleanup_expired_temp_files(max_age_seconds=1500)
     preserve_paths = {
         os.path.abspath(path) for path in (preserve_paths or set())
     }
@@ -308,27 +347,32 @@ def _extract_and_download(video_url, base_opts):
     """
     Robust Multi-Strategy Downloader - Beats Stream (dev by iq4u8)
     
-    If cookies are provided (via cookies.txt or YOUTUBE_COOKIES env),
-    yt-dlp uses strategies with cookies.
-    If no cookies are present, it seamlessly falls back to public clients
-    (android, ios, web) without throwing file errors.
+    Tries native extraction clients (visionos, ios, web) first to bypass bot checks.
+    Only falls back to cookie-bound strategies if necessary.
     """
     cookie_file = get_active_cookie_file()
 
+    # Prioritize strategies that succeed on datacenter IPs without triggering bot challenges
     strategies = [
-        # Strategy 1: Android client with cookies if available (fastest on datacenter IPs)
-        {'player_client': ['android'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['android']},
-        # Strategy 2: Web embedded with cookies (reliable fallback)
-        {'player_client': ['web_embedded'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['web_embedded']},
-        # Strategy 3: Mobile web with cookies
-        {'player_client': ['mweb'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['mweb']},
-        # Strategy 4: iOS client
-        {'player_client': ['ios'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['ios']},
-        # Strategy 5: visionos client
-        {'player_client': ['visionos']},
-        # Strategy 6: web_creator client
-        {'player_client': ['web_creator']},
+        # Strategy 1: Native yt-dlp auto-resolver (visionos + ios + web naturally, no bot check)
+        {},
+        # Strategy 2: visionos & ios clients explicitly
+        {'player_client': ['visionos', 'ios']},
+        # Strategy 3: Android client without cookies
+        {'player_client': ['android']},
     ]
+
+    if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
+        strategies.extend([
+            # Strategy 4: Web embedded with cookies
+            {'player_client': ['web_embedded'], 'cookiefile': cookie_file},
+            # Strategy 5: Mobile web with cookies
+            {'player_client': ['mweb'], 'cookiefile': cookie_file},
+            # Strategy 6: Android with cookies
+            {'player_client': ['android'], 'cookiefile': cookie_file},
+        ])
+
+    strategies.append({'player_client': ['web_creator']})
 
     last_error = None
     for strategy in strategies:
