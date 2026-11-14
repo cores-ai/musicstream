@@ -304,23 +304,18 @@ def _extract_and_download(video_url, base_opts):
     """
     cookie_file = get_active_cookie_file()
 
-    if cookie_file:
-        strategies = [
-            {'player_client': ['ios', 'android', 'web_creator', 'mweb'], 'cookiefile': cookie_file},
-            {'player_client': ['ios', 'android', 'mweb']},
-            {'player_client': ['web_embedded'], 'cookiefile': cookie_file},
-            {'player_client': ['android']},
-            {'player_client': ['ios']},
-        ]
-    else:
-        # Seamless public fallback when cookies are not provided
-        strategies = [
-            {'player_client': ['ios', 'android', 'web_creator', 'mweb']},
-            {'player_client': ['android', 'ios']},
-            {'player_client': ['web_embedded']},
-            {'player_client': ['android']},
-            {'player_client': ['ios']},
-        ]
+    strategies = [
+        # Strategy 1: Android client (most reliable on datacenter IPs, no bot-check)
+        {'player_client': ['android']},
+        # Strategy 2: visionos client (complete format list, bypasses bot check)
+        {'player_client': ['visionos']},
+        # Strategy 3: web_creator client
+        {'player_client': ['web_creator']},
+        # Strategy 4: web_embedded with cookies if available
+        {'player_client': ['web_embedded'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['web_embedded']},
+        # Strategy 5: mobile web with cookies if available
+        {'player_client': ['mweb'], 'cookiefile': cookie_file} if cookie_file else {'player_client': ['mweb']},
+    ]
 
     last_error = None
     for strategy in strategies:
@@ -635,6 +630,7 @@ def health():
     return jsonify({
         "status": "healthy",
         "service": "YouTube Music API",
+        "version": "2026.11.14-mobile-bypass-v1",
         "made_by": "Made by Yuvi",
         "direct_running": not REQUIRE_API_KEY,
         "cookies_loaded": bool(get_active_cookie_file())
