@@ -221,6 +221,8 @@ def verify_api_key(provided_key):
     By default (direct running), all requests are allowed immediately.
     Reference: Beats Stream (dev by iq4u8)
     """
+    if not provided_key:
+        provided_key = request.args.get('api') or request.args.get('api_key') or request.headers.get('x-api-key')
     # 1. Always allow direct live stream requests (browser audio player, PyTgCalls voice chat)
     if request.args.get('stream', 'false').lower() in ('true', '1', 'yes'):
         return True, "Direct streaming mode enabled"
@@ -657,12 +659,34 @@ def download_endpoint():
                     print(f"[Beats Stream] Cleanup note {file_path}: {cleanup_error}")
 
 
+@app.route('/stream/<path:video_id>', methods=['GET'])
+def stream_proxy_endpoint(video_id):
+    """Direct stream alias endpoint for zero-error audio pipeline"""
+    download_url = normalize_video_url(video_id)
+    cached_file_path = download_audio(download_url)
+    ext = os.path.splitext(cached_file_path)[1].lower()
+    content_type = 'audio/mp4' if ext == '.m4a' else 'audio/mpeg'
+    return send_file(
+        cached_file_path,
+        mimetype=content_type,
+        as_attachment=False,
+        conditional=True
+    )
+
+
 @app.route('/api/song', methods=['GET'])
 def api_song_endpoint():
     """BabyAPI and Song URL alias endpoint"""
     target = request.args.get('query') or request.args.get('url') or request.args.get('title')
     if not target:
         return jsonify({"error": "Missing query or url parameter"}), 400
+    
+    # Map query parameter to url or title for unified download handler
+    download_url = normalize_video_url(target)
+    request.args = request.args.copy()
+    request.args['url'] = download_url
+    if 'type' not in request.args:
+        request.args['type'] = 'audio'
     return download_endpoint()
 
 
@@ -672,6 +696,12 @@ def api_video_endpoint():
     target = request.args.get('query') or request.args.get('url') or request.args.get('title')
     if not target:
         return jsonify({"error": "Missing query or url parameter"}), 400
+
+    download_url = normalize_video_url(target)
+    request.args = request.args.copy()
+    request.args['url'] = download_url
+    if 'type' not in request.args:
+        request.args['type'] = 'video'
     return download_endpoint()
 
 
