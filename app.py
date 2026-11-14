@@ -413,7 +413,7 @@ def download_audio(video_url):
     unique_id = str(uuid.uuid4())
     output_template = os.path.join(TEMP_DOWNLOAD_DIR, f"{unique_id}.%(ext)s")
     base_opts = {
-        'format': 'bestaudio/best[height<=480]/best',
+        'format': 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best',
         'outtmpl': output_template,
         'noplaylist': True,
         'quiet': True,
@@ -566,7 +566,7 @@ def search_video():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/download', methods=['GET'])
+@app.route('/download', methods=['GET', 'HEAD'])
 def download_endpoint():
     """
     Unified Direct Download Endpoint.

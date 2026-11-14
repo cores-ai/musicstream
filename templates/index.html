@@ -1153,59 +1153,60 @@ def get_audio_file(query):
             const vinyl = document.getElementById('vinylIcon');
 
             fetchLoader.style.display = 'flex';
-            fetchMsg.textContent = `Resolving audio stream for: "${query}"...`;
-            trackTitle.textContent = `Fetching: ${query}`;
-            trackMeta.innerHTML = `<span>Connecting to YouTube extraction node...</span>`;
+            fetchMsg.textContent = `Resolving audio stream: "${query}"...`;
+            trackTitle.textContent = query;
+            trackMeta.innerHTML = `<span>Connecting to extraction pipeline...</span>`;
 
-            // Direct stream endpoint with universal authorization key
+            // Clear any active playback
+            coreAudio.pause();
+            vinyl.classList.remove('spinning');
+
+            // Direct stream endpoint with universal key
             const streamUrl = `/download?title=${encodeURIComponent(query)}&type=audio&stream=1&api_key=dev_iq4u8`;
 
-            try {
-                // Background metadata lookup
-                fetch(`/search?title=${encodeURIComponent(query)}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data && data.title) {
-                            trackTitle.textContent = data.title;
-                            trackMeta.innerHTML = `<span style="color: #22c55e;">● Live Stream</span> · Duration: ${data.duration || 'Auto'} · 320kbps Opus`;
-                        }
-                    })
-                    .catch(() => {});
+            // Background metadata lookup
+            fetch(`/search?title=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.title) {
+                        trackTitle.textContent = data.title;
+                        const durationStr = data.duration ? `${Math.floor(data.duration / 60)}:${('0' + (data.duration % 60)).slice(-2)}` : 'Live';
+                        trackMeta.innerHTML = `<span style="color: #22c55e;">● Live Stream</span> · Duration: ${durationStr} · 320kbps AAC`;
+                    }
+                })
+                .catch(() => {});
 
-                coreAudio.onerror = (e) => {
-                    console.error("Audio stream load error:", e);
+            coreAudio.onerror = (e) => {
+                if (coreAudio.error && coreAudio.error.code !== 1) {
+                    console.error("Audio stream load error:", coreAudio.error);
                     fetchLoader.style.display = 'none';
                     vinyl.classList.remove('spinning');
-                    trackMeta.innerHTML = `<span style="color: #ef4444;">● Stream error. Retrying direct pipeline...</span>`;
-                    showToast("Connecting direct audio pipe...");
-                };
-
-                coreAudio.oncanplay = () => {
-                    fetchLoader.style.display = 'none';
-                };
-
-                coreAudio.src = streamUrl;
-                coreAudio.load();
-                
-                const playPromise = coreAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        vinyl.classList.add('spinning');
-                        fetchLoader.style.display = 'none';
-                        showToast(`Playing stream: ${query}`);
-                    }).catch(err => {
-                        console.log("Auto-play waiting for user click:", err);
-                        fetchLoader.style.display = 'none';
-                    });
+                    trackMeta.innerHTML = `<span style="color: #ef4444;">● Stream unavailable. Please try another track.</span>`;
                 }
-            } catch (err) {
-                fetchLoader.style.display = 'none';
-                trackMeta.textContent = "Error loading stream. Please try another track.";
-            }
+            };
 
-            coreAudio.onplay = () => vinyl.classList.add('spinning');
-            coreAudio.onpause = () => vinyl.classList.remove('spinning');
-            coreAudio.onended = () => vinyl.classList.remove('spinning');
+            coreAudio.oncanplay = () => {
+                fetchLoader.style.display = 'none';
+            };
+
+            coreAudio.onplaying = () => {
+                fetchLoader.style.display = 'none';
+                vinyl.classList.add('spinning');
+            };
+
+            coreAudio.src = streamUrl;
+            coreAudio.load();
+
+            coreAudio.play().then(() => {
+                fetchLoader.style.display = 'none';
+                vinyl.classList.add('spinning');
+                showToast(`Streaming: ${query}`);
+            }).catch(err => {
+                // If browser blocks unmuted autoplay, present clear ready state
+                console.log("Autoplay paused by browser policy:", err);
+                fetchLoader.style.display = 'none';
+                trackMeta.innerHTML = `<span style="color: #22c55e;">● Stream Ready</span> · Press ▶ Play`;
+            });
         }
     </script>
 </body>
