@@ -1,29 +1,25 @@
-FROM node:20-bookworm-slim
+FROM python:3.11-slim
+
+# Bring in the deno binary. yt-dlp needs a real JS runtime to solve YouTube's
+# signature/n-challenges — without it you get "Signature/n challenge solving
+# failed" warnings and end up with no usable audio/video formats.
+COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
+
+# ffmpeg is required to merge separate video+audio streams (used by the
+# /download?type=video endpoint).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install FFmpeg and python3 if needed for robust audio remuxing
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
-    curl \
-    ca-certificates \
-    python3 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install yt-dlp binary with latest fixes
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
-    && chmod a+rx /usr/local/bin/yt-dlp \
-    && /usr/local/bin/yt-dlp --version
-
-COPY package*.json ./
-RUN npm install --omit=dev
+COPY requirements.txt .
+RUN pip install --no-cache-dir -U -r requirements.txt
 
 COPY . .
 
 ENV PORT=8080
-ENV NODE_ENV=production
-
 EXPOSE 8080
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "gunicorn --timeout 150 --workers 2 --bind 0.0.0.0:${PORT:-8080} app:app"]
