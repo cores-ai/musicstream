@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beats Stream — High-Performance Audio Engine • dev by iq4u8</title>
+    <title>Beats Stream — Next-Gen Audio Engine • dev by iq4u8</title>
     <meta name="description" content="Ultra-fast YouTube audio & video streaming backend engineered for Telegram music bots, web applications, and media nodes. dev by iq4u8.">
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,15 +13,13 @@
         :root {
             --bg-black: #000000;
             --bg-surface: #09090b;
-            --bg-surface-elevated: #121215;
+            --bg-surface-elevated: #111114;
             --border: rgba(255, 255, 255, 0.1);
             --border-hover: rgba(255, 255, 255, 0.25);
             --border-glow: rgba(255, 255, 255, 0.35);
             --text-primary: #ffffff;
             --text-secondary: #a1a1aa;
             --text-muted: #71717a;
-            --accent-white: #ffffff;
-            --accent-silver: #e4e4e7;
             --accent-green: #22c55e;
             --font-sans: 'Plus Jakarta Sans', -apple-system, sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
@@ -31,6 +29,17 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        /* Natural smooth scrolling with hidden scrollbar per user request */
+        html, body {
+            scroll-behavior: smooth;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+
+        html::-webkit-scrollbar, body::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
         }
 
         body {
@@ -49,9 +58,9 @@
             position: fixed;
             inset: 0;
             background-image: 
-                linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-            background-size: 40px 40px;
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 36px 36px;
             pointer-events: none;
             z-index: 0;
         }
@@ -203,18 +212,18 @@
             transform: translateY(-1px);
         }
 
-        /* Main Workspace Container (No Endless Scroll) */
+        /* Main Workspace Container */
         main {
             flex: 1;
-            max-width: 1200px;
+            max-width: 1080px;
             width: 100%;
             margin: 0 auto;
-            padding: 1.75rem 1.5rem 3rem 1.5rem;
+            padding: 2rem 1.5rem 4rem 1.5rem;
             position: relative;
             z-index: 10;
         }
 
-        /* ═══ MODERN SEGMENTED TABS NAV (NO SCROLL DESIGN) ═══ */
+        /* Segmented Tabs Navigation */
         .tabs-header {
             display: flex;
             align-items: center;
@@ -223,14 +232,14 @@
             border: 1px solid var(--border);
             border-radius: 14px;
             padding: 0.35rem;
-            margin-bottom: 1.75rem;
+            margin-bottom: 2rem;
             overflow-x: auto;
         }
 
         .tab-btn {
             flex: 1;
-            min-width: 160px;
-            padding: 0.65rem 1rem;
+            min-width: 140px;
+            padding: 0.7rem 1rem;
             background: transparent;
             border: none;
             color: var(--text-secondary);
@@ -259,7 +268,7 @@
             font-weight: 700;
         }
 
-        /* Tab Contents */
+        /* Tab Content Panes */
         .tab-pane {
             display: none;
             animation: fadeIn 0.25s ease-out forwards;
@@ -274,26 +283,15 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* ═══ TAB 1: PLAYER & ENGINE DECK ═══ */
-        .player-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1.5rem;
-        }
-
-        @media (min-width: 900px) {
-            .player-grid {
-                grid-template-columns: 1.15fr 0.85fr;
-            }
-        }
-
+        /* ═══ TAB 1: PLAYER & ENGINE (STACKED LAYOUT) ═══ */
         .panel-card {
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: 18px;
-            padding: 1.75rem;
+            padding: 2rem;
             position: relative;
             box-shadow: 0 10px 35px rgba(0, 0, 0, 0.5);
+            margin-bottom: 2rem;
         }
 
         .panel-card:hover {
@@ -308,10 +306,10 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 1.25rem;
+            margin-bottom: 1.5rem;
         }
 
-        /* Search & Stream Input */
+        /* Search Row */
         .search-row {
             display: flex;
             gap: 0.65rem;
@@ -323,17 +321,17 @@
             background: #000000;
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 0.85rem 1.15rem;
+            padding: 0.95rem 1.25rem;
             color: #ffffff;
             font-family: var(--font-mono);
-            font-size: 0.88rem;
+            font-size: 0.9rem;
             outline: none;
             transition: all 0.2s ease;
         }
 
         .search-box:focus {
             border-color: #ffffff;
-            box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 14px rgba(255, 255, 255, 0.2);
         }
 
         .btn-stream {
@@ -341,15 +339,15 @@
             color: #000000;
             border: none;
             border-radius: 12px;
-            padding: 0.85rem 1.4rem;
+            padding: 0.95rem 1.6rem;
             font-family: var(--font-mono);
-            font-size: 0.85rem;
+            font-size: 0.88rem;
             font-weight: 800;
             cursor: pointer;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.55rem;
             white-space: nowrap;
         }
 
@@ -377,7 +375,7 @@
         .sugg-chip {
             font-family: var(--font-mono);
             font-size: 0.72rem;
-            padding: 0.3rem 0.65rem;
+            padding: 0.35rem 0.75rem;
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border);
@@ -392,29 +390,27 @@
             background: rgba(255, 255, 255, 0.08);
         }
 
-        /* ═══ LUXURY AUDIO PLAY CARD ═══ */
+        /* Luxury Audio Play Card */
         .play-card {
             background: #000000;
             border: 1px solid var(--border);
             border-radius: 16px;
-            padding: 1.4rem;
+            padding: 1.5rem;
             display: flex;
             flex-direction: column;
-            gap: 1.15rem;
+            gap: 1.25rem;
             position: relative;
-            overflow: hidden;
         }
 
         .play-card-header {
             display: flex;
             align-items: center;
-            gap: 1.1rem;
+            gap: 1.25rem;
         }
 
-        /* Mini Vinyl SVG in Player */
         .mini-vinyl {
-            width: 60px;
-            height: 60px;
+            width: 64px;
+            height: 64px;
             border-radius: 50%;
             background: radial-gradient(circle, #27272a 35%, #09090b 40%, #18181b 70%, #000000 100%);
             border: 1px solid var(--border);
@@ -436,8 +432,8 @@
         }
 
         .mini-vinyl-center {
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
             background: #ffffff;
             border: 3px solid #000000;
@@ -449,7 +445,7 @@
         }
 
         .track-title {
-            font-size: 0.95rem;
+            font-size: 1.05rem;
             font-weight: 700;
             color: #ffffff;
             white-space: nowrap;
@@ -459,68 +455,81 @@
 
         .track-status {
             font-family: var(--font-mono);
-            font-size: 0.72rem;
+            font-size: 0.74rem;
             color: var(--text-muted);
-            margin-top: 0.2rem;
+            margin-top: 0.25rem;
             display: flex;
             align-items: center;
             gap: 0.4rem;
         }
 
-        /* Audio Element Styling */
         .audio-wrap {
             width: 100%;
         }
 
         audio {
             width: 100%;
-            height: 38px;
+            height: 40px;
             outline: none;
             filter: invert(1) hue-rotate(180deg);
-            opacity: 0.9;
+            opacity: 0.92;
         }
 
         /* Loading / Fetching Pulse Banner */
         .fetch-loader {
             display: none;
             align-items: center;
-            gap: 0.65rem;
+            gap: 0.75rem;
             font-family: var(--font-mono);
-            font-size: 0.78rem;
+            font-size: 0.8rem;
             color: #ffffff;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.04);
             border: 1px dashed var(--border-hover);
-            padding: 0.75rem 1rem;
-            border-radius: 10px;
-            margin-bottom: 1rem;
+            padding: 0.85rem 1.15rem;
+            border-radius: 12px;
+            margin-bottom: 1.25rem;
         }
 
         .spinner {
-            width: 14px;
-            height: 14px;
+            width: 16px;
+            height: 16px;
             border: 2px solid rgba(255, 255, 255, 0.2);
             border-top-color: #ffffff;
             border-radius: 50%;
             animation: spin-vinyl 0.8s linear infinite;
         }
 
-        /* Right Side: Animated SVG Sound Visualizer Deck */
-        .vis-container {
+        /* ═══ BOTTOM VISUALIZER & RADAR DECK (PLACED BELOW) ═══ */
+        .bottom-vis-deck {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 2rem;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 280px;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.5);
+        }
+
+        .deck-top-row {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
         }
 
         .waveform-bars {
             display: flex;
             align-items: flex-end;
             justify-content: center;
-            gap: 3px;
-            height: 50px;
+            gap: 4px;
+            height: 52px;
             width: 100%;
-            margin-top: 1.5rem;
+            margin-top: 1.75rem;
         }
 
         .w-bar {
@@ -531,8 +540,8 @@
         }
 
         @keyframes bar-pulse {
-            0% { height: 6px; opacity: 0.25; }
-            100% { height: 46px; opacity: 1; filter: drop-shadow(0 0 4px #ffffff); }
+            0% { height: 8px; opacity: 0.25; }
+            100% { height: 48px; opacity: 1; filter: drop-shadow(0 0 4px #ffffff); }
         }
 
         /* ═══ TAB 2: API ENDPOINTS ═══ */
@@ -540,41 +549,47 @@
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: 16px;
-            padding: 1.5rem;
+            padding: 1.6rem;
             margin-bottom: 1.25rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .endpoint-card:hover {
+            border-color: var(--border-hover);
         }
 
         .endpoint-head {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0.6rem;
+            margin-bottom: 0.75rem;
             font-family: var(--font-mono);
             font-size: 0.85rem;
             font-weight: 700;
-        }
-
-        .method-badge {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid var(--border);
-            color: #ffffff;
-            padding: 0.2rem 0.55rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-family: var(--font-mono);
         }
 
         pre {
             background: #000000;
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 1rem 1.15rem;
+            padding: 1.1rem 1.25rem;
+            max-width: 100%;
             overflow-x: auto;
             font-family: var(--font-mono);
             font-size: 0.82rem;
             color: #e4e4e7;
-            position: relative;
             line-height: 1.6;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+        }
+
+        pre::-webkit-scrollbar {
+            height: 3px;
+        }
+
+        pre::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
         }
 
         .copy-btn {
@@ -584,7 +599,7 @@
             cursor: pointer;
             font-family: var(--font-mono);
             font-size: 0.72rem;
-            padding: 0.25rem 0.65rem;
+            padding: 0.28rem 0.7rem;
             border-radius: 6px;
             transition: all 0.2s ease;
         }
@@ -594,17 +609,12 @@
             color: #000000;
         }
 
-        /* ═══ TAB 3: BOT & CLIENT SDK ═══ */
-        .code-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1.25rem;
-        }
-
-        @media (min-width: 900px) {
-            .code-grid {
-                grid-template-columns: 1fr 1fr;
-            }
+        /* ═══ TAB 3: BOT & CLIENT SDK (FULL WIDTH STACKED) ═══ */
+        .code-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            width: 100%;
         }
 
         /* ═══ TAB 4: COOKIE & DEPLOYMENT ═══ */
@@ -612,16 +622,16 @@
             background: #000000;
             border: 1px solid var(--border);
             border-radius: 14px;
-            padding: 1.25rem;
+            padding: 1.35rem;
             margin-top: 1rem;
             display: flex;
             align-items: flex-start;
-            gap: 1rem;
+            gap: 1.25rem;
         }
 
         .step-badge {
-            width: 28px;
-            height: 28px;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             background: #ffffff;
             color: #000000;
@@ -630,7 +640,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             flex-shrink: 0;
         }
 
@@ -736,7 +746,7 @@
         </div>
     </header>
 
-    <!-- ═══ MAIN WORKSPACE (SINGLE VIEW TABBED) ═══ -->
+    <!-- ═══ MAIN WORKSPACE ═══ -->
     <main>
         
         <!-- Segmented Navigation Tabs -->
@@ -772,123 +782,124 @@
             </button>
         </div>
 
-        <!-- ═══ TAB 1: PLAYER & ENGINE ═══ -->
+        <!-- ═══ TAB 1: PLAYER & ENGINE (STACKED DESIGN) ═══ -->
         <div id="tab-player" class="tab-pane active">
-            <div class="player-grid">
-                
-                <!-- Left: Search & Stream Box -->
-                <div class="panel-card">
-                    <div class="card-heading">
-                        <span>⚡ Stream Search & Live Audio Dock</span>
-                        <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">DIRECT PIPELINE</span>
-                    </div>
-
-                    <form onsubmit="handleSearchSubmit(event)" class="search-row">
-                        <input 
-                            type="text" 
-                            id="queryInput" 
-                            class="search-box" 
-                            placeholder="Type track name or YouTube URL (e.g. Dil Diyan Gallan)..." 
-                            value=""
-                            autocomplete="off"
-                        >
-                        <button type="submit" class="btn-stream">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                            <span>Stream</span>
-                        </button>
-                    </form>
-
-                    <!-- Quick Suggestions -->
-                    <div class="suggestions">
-                        <span class="sugg-label">Try:</span>
-                        <span class="sugg-chip" onclick="applySuggestion('Dil Diyan Gallan')">Dil Diyan Gallan</span>
-                        <span class="sugg-chip" onclick="applySuggestion('Tum Hi Ho')">Tum Hi Ho</span>
-                        <span class="sugg-chip" onclick="applySuggestion('Blinding Lights')">Blinding Lights</span>
-                        <span class="sugg-chip" onclick="applySuggestion('Chill Lofi Beats')">Chill Lofi Beats</span>
-                    </div>
-
-                    <!-- Fetch Loader -->
-                    <div id="fetchLoader" class="fetch-loader">
-                        <div class="spinner"></div>
-                        <span id="fetchMsg">Connecting to YouTube extraction node...</span>
-                    </div>
-
-                    <!-- Luxury Audio Play Card -->
-                    <div class="play-card">
-                        <div class="play-card-header">
-                            <div id="vinylIcon" class="mini-vinyl">
-                                <div class="mini-vinyl-center"></div>
-                            </div>
-                            <div class="track-info">
-                                <div id="trackTitle" class="track-title">Ready for Stream</div>
-                                <div id="trackMeta" class="track-status">
-                                    <span>Enter any song title or URL to start streaming</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="audio-wrap">
-                            <audio id="coreAudio" controls preload="none"></audio>
-                        </div>
-                    </div>
+            
+            <!-- Top: Stream Search & Play Card -->
+            <div class="panel-card">
+                <div class="card-heading">
+                    <span>⚡ Stream Search & Live Audio Dock</span>
+                    <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">DIRECT PIPELINE</span>
                 </div>
 
-                <!-- Right: Animated SVG Visualizer Deck -->
-                <div class="panel-card vis-container">
-                    <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <span style="font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; color: #ffffff;">
-                            ACOUSTIC SPECTRUM
-                        </span>
-                        <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">
-                            dev by iq4u8
-                        </span>
-                    </div>
+                <form onsubmit="handleSearchSubmit(event)" class="search-row">
+                    <input 
+                        type="text" 
+                        id="queryInput" 
+                        class="search-box" 
+                        placeholder="Type track name or YouTube URL (e.g. Dil Diyan Gallan)..." 
+                        value=""
+                        autocomplete="off"
+                    >
+                    <button type="submit" class="btn-stream">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <span>Stream</span>
+                    </button>
+                </form>
 
-                    <!-- Concentric Radar SVG -->
-                    <svg width="160" height="160" viewBox="0 0 200 200" fill="none">
-                        <circle cx="100" cy="100" r="90" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1.5" stroke-dasharray="8 6">
-                            <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="25s" repeatCount="indefinite"/>
-                        </circle>
-                        <circle cx="100" cy="100" r="68" stroke="rgba(255, 255, 255, 0.25)" stroke-width="1" stroke-dasharray="14 4">
-                            <animateTransform attributeName="transform" type="rotate" from="360 100 100" to="0 100 100" dur="18s" repeatCount="indefinite"/>
-                        </circle>
-                        <circle cx="100" cy="100" r="46" stroke="#ffffff" stroke-width="1.5"/>
-                        <circle cx="100" cy="100" r="24" fill="#18181b" stroke="#ffffff" stroke-width="2"/>
-                        <circle cx="100" cy="100" r="6" fill="#ffffff"/>
-
-                        <!-- Radar beam -->
-                        <line x1="100" y1="100" x2="100" y2="10" stroke="#ffffff" stroke-width="2" stroke-linecap="round">
-                            <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="4s" repeatCount="indefinite"/>
-                        </line>
-                    </svg>
-
-                    <!-- Waveform Spectrum Bars -->
-                    <div class="waveform-bars">
-                        <div class="w-bar" style="animation-delay: 0.1s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.3s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.15s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.45s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.2s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.6s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.35s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.5s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.25s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.7s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.4s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.65s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.1s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.55s;"></div>
-                        <div class="w-bar" style="animation-delay: 0.3s;"></div>
-                    </div>
-
-                    <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); margin-top: 1rem;">
-                        48kHz Opus · Sub-40ms Start
-                    </div>
+                <!-- Quick Suggestions -->
+                <div class="suggestions">
+                    <span class="sugg-label">Try:</span>
+                    <span class="sugg-chip" onclick="applySuggestion('Dil Diyan Gallan')">Dil Diyan Gallan</span>
+                    <span class="sugg-chip" onclick="applySuggestion('Tum Hi Ho')">Tum Hi Ho</span>
+                    <span class="sugg-chip" onclick="applySuggestion('Blinding Lights')">Blinding Lights</span>
+                    <span class="sugg-chip" onclick="applySuggestion('Chill Lofi Beats')">Chill Lofi Beats</span>
                 </div>
 
+                <!-- Fetch Loader -->
+                <div id="fetchLoader" class="fetch-loader">
+                    <div class="spinner"></div>
+                    <span id="fetchMsg">Connecting to YouTube extraction node...</span>
+                </div>
+
+                <!-- Luxury Audio Play Card -->
+                <div class="play-card">
+                    <div class="play-card-header">
+                        <div id="vinylIcon" class="mini-vinyl">
+                            <div class="mini-vinyl-center"></div>
+                        </div>
+                        <div class="track-info">
+                            <div id="trackTitle" class="track-title">Ready for Stream</div>
+                            <div id="trackMeta" class="track-status">
+                                <span>Enter any song title or URL to start streaming</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="audio-wrap">
+                        <audio id="coreAudio" controls preload="none"></audio>
+                    </div>
+                </div>
             </div>
+
+            <!-- Bottom: Acoustic Spectrum & Radar Deck (Full Width Beneath Player) -->
+            <div class="bottom-vis-deck">
+                <div class="deck-top-row">
+                    <span style="font-weight: 700; color: #ffffff;">
+                        ACOUSTIC SPECTRUM & TELEMETRY
+                    </span>
+                    <span style="color: var(--text-muted);">
+                        dev by iq4u8
+                    </span>
+                </div>
+
+                <!-- Animated Concentric Radar SVG -->
+                <svg width="170" height="170" viewBox="0 0 200 200" fill="none">
+                    <circle cx="100" cy="100" r="90" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1.5" stroke-dasharray="8 6">
+                        <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="25s" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="100" cy="100" r="68" stroke="rgba(255, 255, 255, 0.25)" stroke-width="1" stroke-dasharray="14 4">
+                        <animateTransform attributeName="transform" type="rotate" from="360 100 100" to="0 100 100" dur="18s" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="100" cy="100" r="46" stroke="#ffffff" stroke-width="1.5"/>
+                    <circle cx="100" cy="100" r="24" fill="#18181b" stroke="#ffffff" stroke-width="2"/>
+                    <circle cx="100" cy="100" r="6" fill="#ffffff"/>
+
+                    <!-- Radar beam -->
+                    <line x1="100" y1="100" x2="100" y2="10" stroke="#ffffff" stroke-width="2" stroke-linecap="round">
+                        <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="4s" repeatCount="indefinite"/>
+                    </line>
+                </svg>
+
+                <!-- Waveform Spectrum Bars -->
+                <div class="waveform-bars">
+                    <div class="w-bar" style="animation-delay: 0.1s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.3s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.15s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.45s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.2s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.6s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.35s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.5s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.25s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.7s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.4s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.65s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.1s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.55s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.3s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.75s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.2s;"></div>
+                    <div class="w-bar" style="animation-delay: 0.5s;"></div>
+                </div>
+
+                <div style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-muted); margin-top: 1.25rem;">
+                    48kHz Opus · Sub-40ms Start · Native yt-dlp Extraction
+                </div>
+            </div>
+
         </div>
 
         <!-- ═══ TAB 2: API ENDPOINTS ═══ -->
@@ -939,9 +950,9 @@
 
         </div>
 
-        <!-- ═══ TAB 3: BOT & CLIENT SDK ═══ -->
+        <!-- ═══ TAB 3: BOT & CLIENT SDK (FULL WIDTH STACKED) ═══ -->
         <div id="tab-bots" class="tab-pane">
-            <div class="code-grid">
+            <div class="code-stack">
                 
                 <div class="endpoint-card">
                     <div class="endpoint-head">
@@ -1091,11 +1102,11 @@ def get_audio_file(query):
             trackTitle.textContent = `Fetching: ${query}`;
             trackMeta.innerHTML = `<span>Connecting to YouTube extraction node...</span>`;
 
-            // Construct direct stream URL
+            // Direct stream endpoint
             const streamUrl = `/download?title=${encodeURIComponent(query)}&type=audio&stream=1`;
 
             try {
-                // Fetch metadata via /search in background for instantaneous title display
+                // Background metadata lookup
                 fetch(`/search?title=${encodeURIComponent(query)}`)
                     .then(res => res.json())
                     .then(data => {
@@ -1106,7 +1117,6 @@ def get_audio_file(query):
                     })
                     .catch(() => {});
 
-                // Mount stream directly to audio player
                 coreAudio.src = streamUrl;
                 coreAudio.load();
                 
