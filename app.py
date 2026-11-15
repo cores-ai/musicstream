@@ -168,7 +168,11 @@ try:
 except ValueError:
     COOKIE_CHECK_BATCH = 3
 COOKIE_PROBE_VIDEO = os.environ.get("COOKIE_PROBE_VIDEO", "dQw4w9WgXcQ")
-ENABLE_COOKIE_HEALTH = os.environ.get("ENABLE_COOKIE_HEALTH", "true").lower() in ("true", "1", "yes")
+# Off by default: probing every 30s from the Railway IP does nothing useful
+# (the only client that returns audio, `android`, passes with or without
+# cookies) while hammering YouTube from the same IP that already gets
+# bot-checked. Opt back in with ENABLE_COOKIE_HEALTH=true only if needed.
+ENABLE_COOKIE_HEALTH = os.environ.get("ENABLE_COOKIE_HEALTH", "false").lower() in ("true", "1", "yes")
 
 _d1_cookies_pool = []
 _d1_cookie_idx = 0
@@ -445,16 +449,19 @@ def resolve_live_audio(video_url, force=False):
             return cached
 
     cookie_file = get_active_cookie_file()
+    # Only the mobile clients still hand out a real audio format: probed locally,
+    # `android` returns audio with or without cookies, while web/ios/tv/web_embedded
+    # and mweb never return media (web_embedded/mweb only yield storyboards). Racing
+    # the dead clients just burns CPU and delays the cold resolve, so keep it short.
     strategies = [
         {'player_client': ['android']},
-        {},
         {'player_client': ['visionos', 'ios']},
+        {},
     ]
     if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
-        strategies.extend([
-            {'player_client': ['web_embedded'], 'cookiefile': cookie_file},
-            {'player_client': ['mweb'], 'cookiefile': cookie_file},
-        ])
+        # Cookies can still lift a datacenter-IP bot-check, so keep one cookie-bound
+        # attempt - but only on the client that actually returns audio.
+        strategies.append({'player_client': ['android'], 'cookiefile': cookie_file})
 
     last_error = None
     futures = [_live_executor.submit(_extract_live_entry, video_url, s) for s in strategies]
@@ -1243,7 +1250,7 @@ def health():
     return jsonify({
         "status": "healthy",
         "service": "YouTube Music API",
-        "version": "2026.11.14-mobile-bypass-v1",
+        "version": "2026.11.16-fastresolve-v1",
         "dev_by": "iq4u8",
         "direct_running": not REQUIRE_API_KEY,
         "cookies_loaded": cookies_loaded(),
