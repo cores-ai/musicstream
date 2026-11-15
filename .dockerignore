@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+cookies.txt
+cookie*.txt
+main v5/
+tmp/
+__pycache__/
+*.pyc
+*.pyo
+*.pdb
+.venv
+venv/
+.DS_Store

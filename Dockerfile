@@ -22,4 +22,6 @@ ENV PORT=8080
 EXPOSE 8080
 EXPOSE 3000
 
-CMD ["sh", "-c", "gunicorn --timeout 150 --workers 2 --bind 0.0.0.0:${PORT:-8080} app:app"]
+# gthread (not sync) is required: /live holds the connection open for the whole
+# song, so long-running streams must not occupy (and block) a whole worker.
+CMD ["sh", "-c", "gunicorn --timeout 150 --workers 2 --threads 16 --worker-class gthread --bind 0.0.0.0:${PORT:-8080} app:app"]

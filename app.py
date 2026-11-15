@@ -3,15 +3,18 @@
 # dev by iq4u8
 # ========================================================
 
-from flask import Flask, request, jsonify, send_file, render_template
+from flask import Flask, request, jsonify, send_file, render_template, Response, stream_with_context
 import yt_dlp
 import os
+import time
 import uuid
+import threading
 import requests
 import hashlib
 import glob
 import shutil
 import tempfile
+import concurrent.futures
 from datetime import datetime, timezone
 
 # Initialize Flask Application - Beats Stream (dev by iq4u8)
@@ -36,8 +39,11 @@ def _load_dotenv():
 
 _load_dotenv()
 
+# Project root: works cross-platform on Windows, Linux and cloud (Render / Railway / Docker)
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
 # Base directory: Works cross-platform on Windows, Linux, and Cloud (Render / Railway / Vercel / Docker)
-BASE_TEMP_DIR = os.environ.get("TEMP_DIR") or ("/tmp" if os.name != "nt" else os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp"))
+BASE_TEMP_DIR = os.environ.get("TEMP_DIR") or ("/tmp" if os.name != "nt" else os.path.join(PROJECT_ROOT, "tmp"))
 
 # Directory for temporary downloads (cleared after each request)
 TEMP_DOWNLOAD_DIR = os.path.join(BASE_TEMP_DIR, "download")
@@ -51,6 +57,10 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 CACHE_VIDEO_DIR = os.path.join(BASE_TEMP_DIR, "cache_video")
 os.makedirs(CACHE_VIDEO_DIR, exist_ok=True)
 
+# Directory where D1 cookie rows are materialised as Netscape jars (kept out of the repo)
+COOKIE_DIR = os.path.join(BASE_TEMP_DIR, "cookies")
+os.makedirs(COOKIE_DIR, exist_ok=True)
+
 # Maximum cache size in bytes (2GB)
 MAX_CACHE_SIZE = 2 * 1024 * 1024 * 1024
 
@@ -63,7 +73,7 @@ PROXY_URL = os.environ.get("PROXY_URL")
 # Direct Running & Access Control - Beats Stream (dev by iq4u8)
 # By default, REQUIRE_API_KEY is False for direct running without any barrier.
 REQUIRE_API_KEY = os.environ.get("REQUIRE_API_KEY", "false").lower() in ("true", "1", "yes")
-API_KEY = os.environ.get("API_KEY", "Beats Stream (dev by iq4u8)")
+API_KEY = os.environ.get("API_KEY", "")
 
 
 def get_js_runtimes_config():
@@ -131,74 +141,127 @@ def resolve_title_to_video_info(title):
     return None
 
 
-# Cloudflare D1 Credentials for dynamic multi-cookie pool rotation
-CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "cc51e0e5c3dd225c36751796cf196ca5")
-CF_DB_ID = os.environ.get("CLOUDFLARE_DATABASE_ID", "111062d4-ab1e-4d65-abc3-66bcddc28aa6")
-_token_parts = ["cfut_", "rSlAzQOAbn104csoheQOJNibEHoXTiByv", "15mnxKEb35cc49a"]
-CF_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN") or "".join(_token_parts)
+# ------------------------------------------------------------------
+# Cookie pool: Cloudflare D1 (bulk, multiline) + env fallbacks.
+# Every credential comes from the environment only - nothing hardcoded.
+# ------------------------------------------------------------------
+CF_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+CF_DB_ID = os.environ.get("CLOUDFLARE_DATABASE_ID", "")
+CF_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
+
+# How many valid D1 rows to pull per sync, and how often to refresh the pool.
+try:
+    D1_COOKIE_LIMIT = max(1, int(os.environ.get("D1_COOKIE_LIMIT", "200")))
+except ValueError:
+    D1_COOKIE_LIMIT = 200
+D1_SYNC_INTERVAL = 600  # seconds
 
 _d1_cookies_pool = []
 _d1_cookie_idx = 0
+_d1_last_sync = 0.0
+_d1_lock = threading.Lock()
+
 
 def clean_netscape_cookie(raw):
-    lines = raw.splitlines()
+    """Normalise a raw cookie blob (CRLF or LF, multiline) into a valid Netscape jar."""
     out = ["# Netscape HTTP Cookie File", "# https://curl.se/docs/http-cookies.html", ""]
-    for l in lines:
-        s = l.strip()
-        if not s:
+    for line in (raw or "").splitlines():
+        line = line.strip()
+        if not line:
             continue
-        if s.startswith("#") or "\t" in s:
-            out.append(s)
+        if line.startswith("#") or "\t" in line:
+            out.append(line)
         else:
-            out.append(f"# {s}")
-    return "\n".join(out)
+            out.append(f"# {line}")
+    return "\n".join(out) + "\n"
 
-def sync_cookies_from_d1():
-    global _d1_cookies_pool
-    if not CF_ACCOUNT_ID or not CF_DB_ID or not CF_TOKEN:
-        return
+
+def sync_cookies_from_d1(force=False):
+    """Load the whole valid cookie pool from D1. Re-syncs at most every D1_SYNC_INTERVAL."""
+    global _d1_cookies_pool, _d1_last_sync
+    if not (CF_ACCOUNT_ID and CF_DB_ID and CF_TOKEN):
+        return False
+
+    now = time.time()
+    with _d1_lock:
+        if not force and _d1_cookies_pool and (now - _d1_last_sync) < D1_SYNC_INTERVAL:
+            return True
+
     try:
         url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/d1/database/{CF_DB_ID}/query"
-        payload = {"sql": "SELECT id, filename, cookie_content FROM youtube_cookies WHERE is_valid = 1 ORDER BY last_used ASC LIMIT 50;"}
-        r = requests.post(url, headers={"Authorization": f"Bearer {CF_TOKEN}", "Content-Type": "application/json"}, json=payload, timeout=8)
-        if r.status_code == 200:
-            data = r.json()
-            if data.get("success") and data.get("result") and len(data["result"]) > 0:
-                results = data["result"][0].get("results", [])
-                if results:
-                    _d1_cookies_pool = results
-                    print(f"[D1Sync] Loaded {len(_d1_cookies_pool)} valid cookies from D1 Database!")
+        payload = {
+            "sql": (
+                "SELECT id, filename, cookie_content FROM youtube_cookies "
+                "WHERE is_valid = 1 AND length(cookie_content) > 0 "
+                f"ORDER BY last_used ASC LIMIT {D1_COOKIE_LIMIT};"
+            )
+        }
+        r = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {CF_TOKEN}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=8,
+        )
+        if r.status_code != 200:
+            print(f"[D1Sync] HTTP {r.status_code}")
+            return False
+        data = r.json()
+        if not data.get("success"):
+            print("[D1Sync] Query rejected by D1")
+            return False
+        result_sets = data.get("result") or []
+        results = result_sets[0].get("results", []) if result_sets else []
+        results = [row for row in results if (row.get("cookie_content") or "").strip()]
+        if not results:
+            print("[D1Sync] No valid cookies found in D1")
+            return False
+        with _d1_lock:
+            _d1_cookies_pool = results
+            _d1_last_sync = now
+        print(f"[D1Sync] Loaded {len(results)} valid cookies from D1 Database!")
+        return True
     except Exception as e:
         print(f"[D1Sync] Cookie sync note: {e}")
+        return False
 
-try:
-    sync_cookies_from_d1()
-except Exception:
-    pass
+
+def _materialise_cookie_file(row):
+    """Write one D1 row to a Netscape jar on disk, atomically and outside the repo."""
+    target_path = os.path.join(COOKIE_DIR, f"d1_cookie_{row.get('id', 0)}.txt")
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
+        return target_path
+    tmp_path = f"{target_path}.{uuid.uuid4().hex}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(clean_netscape_cookie(row.get("cookie_content", "")))
+    os.replace(tmp_path, target_path)
+    return target_path
+
+
+def _configured_cookie_file():
+    configured_file = os.environ.get("COOKIES_FILE", "cookies.txt")
+    return configured_file if os.path.isabs(configured_file) else os.path.join(PROJECT_ROOT, configured_file)
+
 
 def get_active_cookie_file():
     """
-    Cookie Resolution Engine with D1 Dynamic Pool Rotation
+    Resolve the cookie jar for a real download.
+    Rotates across the entire D1 pool and refreshes the pool periodically.
     """
-    global _d1_cookie_idx, _d1_cookies_pool
-    project_root = os.path.dirname(os.path.abspath(__file__))
+    global _d1_cookie_idx
 
-    # 1. Check if D1 has valid cookies in memory pool
+    sync_cookies_from_d1()
+
     if _d1_cookies_pool:
-        cookie = _d1_cookies_pool[_d1_cookie_idx % len(_d1_cookies_pool)]
-        _d1_cookie_idx += 1
-        target_path = os.path.join(project_root, f"cookie_{cookie.get('id', 1)}.txt")
-        if not os.path.exists(target_path):
-            try:
-                cleaned = clean_netscape_cookie(cookie.get("cookie_content", ""))
-                with open(target_path, "w", encoding="utf-8") as f:
-                    f.write(cleaned)
-            except Exception as e:
-                print(f"[Cookie] Write err: {e}")
-        return target_path
+        with _d1_lock:
+            row = _d1_cookies_pool[_d1_cookie_idx % len(_d1_cookies_pool)]
+            _d1_cookie_idx += 1
+        try:
+            return _materialise_cookie_file(row)
+        except Exception as e:
+            print(f"[Cookie] Write err: {e}")
+            return None
 
-    configured_file = os.environ.get("COOKIES_FILE", "cookies.txt")
-    target_path = configured_file if os.path.isabs(configured_file) else os.path.join(project_root, configured_file)
+    target_path = _configured_cookie_file()
 
     env_cookies = os.environ.get("YOUTUBE_COOKIES") or os.environ.get("COOKIES")
     if env_cookies and env_cookies.strip():
@@ -213,6 +276,154 @@ def get_active_cookie_file():
         return target_path
 
     return None
+
+
+def cookies_loaded():
+    """Status only - never rotates the pool and never writes to disk."""
+    if _d1_cookies_pool:
+        return True
+    if (os.environ.get("YOUTUBE_COOKIES") or os.environ.get("COOKIES") or "").strip():
+        return True
+    target_path = _configured_cookie_file()
+    return os.path.exists(target_path) and os.path.getsize(target_path) > 0
+
+
+def d1_pool_size():
+    with _d1_lock:
+        return len(_d1_cookies_pool)
+
+
+sync_cookies_from_d1(force=True)
+
+
+# ------------------------------------------------------------------
+# Live pass-through streaming.
+# Resolves the upstream audio URL once (no download, no transcode) and
+# reverse-proxies it with Range support so playback starts in ~1s.
+# ------------------------------------------------------------------
+LIVE_URL_TTL = int(os.environ.get("LIVE_URL_TTL", "14400"))  # upstream links live ~6h
+
+_live_cache = {}
+_live_lock = threading.Lock()
+
+# Reused HTTP session: keeps TCP/TLS connections to the CDN alive, which is what
+# takes the warm pass-through latency from ~2s down to a few hundred ms.
+_upstream_session = requests.Session()
+_upstream_adapter = requests.adapters.HTTPAdapter(pool_connections=32, pool_maxsize=64, max_retries=0)
+_upstream_session.mount("https://", _upstream_adapter)
+_upstream_session.mount("http://", _upstream_adapter)
+
+
+def _live_cache_key(video_url):
+    return hashlib.md5(("live_" + video_url).encode("utf-8")).hexdigest()
+
+
+def _live_cache_get(key):
+    with _live_lock:
+        entry = _live_cache.get(key)
+        if not entry:
+            return None
+        if time.time() >= entry["expires"]:
+            _live_cache.pop(key, None)
+            return None
+        return entry
+
+
+def _live_cache_put(key, entry):
+    with _live_lock:
+        _live_cache[key] = entry
+
+
+def _live_cache_drop(key):
+    with _live_lock:
+        _live_cache.pop(key, None)
+
+
+def _extract_live_entry(video_url, strategy):
+    """
+    Single extraction attempt (one player_client variant) - no download, no transcode.
+    Beats Stream (dev by iq4u8)
+    """
+    opts = {
+        # Audio-only on purpose: falling back to 'best' would silently stream a
+        # full video file (3-7x the bytes) for an audio-only request.
+        'format': 'bestaudio[ext=m4a]/bestaudio',
+        'quiet': True,
+        'no_warnings': True,
+        'skip_download': True,
+        'noplaylist': True,
+        'socket_timeout': 10,
+        'js_runtimes': get_js_runtimes_config(),
+    }
+    if 'player_client' in strategy:
+        opts['extractor_args'] = {'youtube': {'player_client': strategy['player_client']}}
+    if 'cookiefile' in strategy:
+        opts['cookiefile'] = strategy['cookiefile']
+    if PROXY_URL:
+        opts['proxy'] = PROXY_URL
+
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(video_url, download=False)
+    if info.get('entries'):
+        info = info['entries'][0]
+    direct = info.get('url')
+    if not direct or not str(direct).startswith('http'):
+        raise Exception("extraction returned no direct upstream url")
+    return {
+        'url': direct,
+        'headers': dict(info.get('http_headers') or {}),
+        'title': info.get('title'),
+        'duration': info.get('duration'),
+        'id': info.get('id'),
+    }
+
+
+def resolve_live_audio(video_url, force=False):
+    """
+    Resolve the direct upstream audio URL without downloading anything.
+
+    All player-client strategies are raced in parallel and the first successful
+    extraction wins, so a cold resolve only costs as long as the fastest
+    successful strategy (~1-3s) instead of the sum of every attempt.
+    Result is cached in memory; force=True re-resolves after a signature expires.
+    Beats Stream (dev by iq4u8)
+    """
+    key = _live_cache_key(video_url)
+    if not force:
+        cached = _live_cache_get(key)
+        if cached:
+            return cached
+
+    cookie_file = get_active_cookie_file()
+    strategies = [
+        {'player_client': ['android']},
+        {},
+        {'player_client': ['visionos', 'ios']},
+    ]
+    if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
+        strategies.extend([
+            {'player_client': ['web_embedded'], 'cookiefile': cookie_file},
+            {'player_client': ['mweb'], 'cookiefile': cookie_file},
+        ])
+
+    last_error = None
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(strategies))
+    try:
+        futures = [executor.submit(_extract_live_entry, video_url, s) for s in strategies]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                entry = future.result()
+            except Exception as e:
+                last_error = e
+                continue
+            entry['expires'] = time.time() + LIVE_URL_TTL
+            _live_cache_put(key, entry)
+            print(f"[Live] Resolved direct audio URL for {entry.get('id', video_url)}")
+            return entry
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    raise last_error if last_error else Exception("live resolution failed across all strategies")
 
 
 def verify_api_key(provided_key):
@@ -240,7 +451,7 @@ def verify_api_key(provided_key):
     if not provided_key:
         return False, "Missing api_key parameter"
 
-    if provided_key in (API_KEY, "iq4u8", "dev_iq4u8", "cores_secret_key_2026", "beats_stream_2026"):
+    if API_KEY and provided_key == API_KEY:
         return True, "Valid API key"
 
     return False, "Invalid API key"
@@ -262,8 +473,6 @@ def get_directory_size(directory):
                 total_size += os.path.getsize(fp)
     return total_size
 
-
-import threading
 
 def cleanup_expired_temp_files(max_age_seconds=1500):
     """
@@ -674,6 +883,87 @@ def stream_proxy_endpoint(video_id):
     )
 
 
+@app.route('/live/<path:video_id>', methods=['GET'])
+def live_stream_endpoint(video_id):
+    """
+    Zero-wait pass-through audio stream.
+
+    Resolves the direct upstream audio URL (cached, no download, no transcode)
+    and reverse-proxies it with Range support, so playback starts in about a
+    second instead of waiting for a full download plus ffmpeg transcode.
+    Beats Stream (dev by iq4u8)
+    """
+    api_key = request.args.get('api_key') or request.headers.get('x-api-key')
+    is_valid, reason = verify_api_key(api_key)
+    if not is_valid:
+        return jsonify({"error": reason}), 401
+
+    try:
+        video_url = normalize_video_url(request.args.get('url') or video_id)
+        if "spotify.com" in video_url:
+            video_url = resolve_spotify_link(video_url)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    key = _live_cache_key(video_url)
+    upstream = None
+    for attempt in (False, True):
+        try:
+            resolved = resolve_live_audio(video_url, force=attempt)
+        except Exception as e:
+            return jsonify({"error": f"live resolve failed: {e}"}), 502
+
+        upstream_headers = dict(resolved.get('headers') or {})
+        client_range = request.headers.get('Range')
+        if client_range:
+            upstream_headers['Range'] = client_range
+
+        try:
+            upstream = _upstream_session.get(
+                resolved['url'],
+                headers=upstream_headers,
+                stream=True,
+                timeout=(6, 30),
+                allow_redirects=True,
+            )
+        except Exception:
+            upstream = None
+            continue
+
+        if upstream.status_code in (200, 206):
+            break
+
+        # Most likely an expired signature: drop the cache entry and re-resolve once
+        _live_cache_drop(key)
+        upstream.close()
+        upstream = None
+
+    if upstream is None:
+        return jsonify({"error": "upstream audio unavailable"}), 502
+
+    passthrough = {}
+    for header in ('Content-Type', 'Content-Length', 'Content-Range', 'Accept-Ranges'):
+        value = upstream.headers.get(header)
+        if value:
+            passthrough[header] = value
+    passthrough.setdefault('Accept-Ranges', 'bytes')
+    passthrough['Cache-Control'] = 'no-store'
+
+    def generate():
+        try:
+            for chunk in upstream.iter_content(chunk_size=64 * 1024):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream.close()
+
+    return Response(
+        stream_with_context(generate()),
+        status=upstream.status_code,
+        headers=passthrough,
+    )
+
+
 @app.route('/api/song', methods=['GET'])
 def api_song_endpoint():
     """BabyAPI and Song URL alias endpoint"""
@@ -712,7 +1002,7 @@ def home():
     No login page or database required - Direct running.
     Reference: Beats Stream (dev by iq4u8)
     """
-    has_cookies = bool(get_active_cookie_file())
+    has_cookies = cookies_loaded()
     return render_template(
         'index.html',
         made_by="dev by iq4u8",
@@ -734,13 +1024,14 @@ def health():
         "version": "2026.11.14-mobile-bypass-v1",
         "dev_by": "iq4u8",
         "direct_running": not REQUIRE_API_KEY,
-        "cookies_loaded": bool(get_active_cookie_file())
+        "cookies_loaded": cookies_loaded(),
+        "d1_pool_size": d1_pool_size()
     })
 
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    cookie_status = "Loaded" if get_active_cookie_file() else "None (Add cookies.txt or YOUTUBE_COOKIES in .env)"
+    cookie_status = "Loaded" if cookies_loaded() else "None (Add cookies.txt or YOUTUBE_COOKIES in .env)"
     print("=" * 60)
     print("⚡ Beats Stream Audio Engine — dev by iq4u8")
     print("✨ Author: iq4u8 (@iq4u8)")
