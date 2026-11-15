@@ -156,6 +156,20 @@ except ValueError:
     D1_COOKIE_LIMIT = 200
 D1_SYNC_INTERVAL = 600  # seconds
 
+# Cookie health monitor: prove a sample of the pool still passes YouTube
+# bot-checks, disable the dead ones in D1 and refill from the spares so the pool
+# never runs dry (a dry pool is what pushes every fresh song into the slow ladder).
+try:
+    COOKIE_CHECK_INTERVAL = max(5, int(os.environ.get("COOKIE_CHECK_INTERVAL", "30")))
+except ValueError:
+    COOKIE_CHECK_INTERVAL = 30
+try:
+    COOKIE_CHECK_BATCH = max(1, int(os.environ.get("COOKIE_CHECK_BATCH", "3")))
+except ValueError:
+    COOKIE_CHECK_BATCH = 3
+COOKIE_PROBE_VIDEO = os.environ.get("COOKIE_PROBE_VIDEO", "dQw4w9WgXcQ")
+ENABLE_COOKIE_HEALTH = os.environ.get("ENABLE_COOKIE_HEALTH", "true").lower() in ("true", "1", "yes")
+
 _d1_cookies_pool = []
 _d1_cookie_idx = 0
 _d1_last_sync = 0.0
@@ -544,6 +558,178 @@ def _start_background_cache_cleaner():
     t.start()
 
 _start_background_cache_cleaner()
+
+
+# ------------------------------------------------------------------
+# Cookie health monitor.
+# A dead cookie silently poisons the whole pool: the resolver keeps rotating it
+# back in, YouTube answers with a bot-check, and the caller drops to the slow
+# download ladder. This worker proves a small sample every cycle, disables the
+# failures in D1 and refills the pool from the spare rows so it stays usable.
+# ------------------------------------------------------------------
+def _d1_query(sql, params=None):
+    """Run one statement against Cloudflare D1. Returns the result payload or None."""
+    if not (CF_ACCOUNT_ID and CF_DB_ID and CF_TOKEN):
+        return None
+    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/d1/database/{CF_DB_ID}/query"
+    payload = {"sql": sql}
+    if params:
+        payload["params"] = params
+    try:
+        r = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {CF_TOKEN}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=8,
+        )
+        if r.status_code != 200:
+            print(f"[CookieHealth] D1 HTTP {r.status_code}")
+            return None
+        data = r.json()
+        if not data.get("success"):
+            print("[CookieHealth] D1 rejected the query")
+            return None
+        return data.get("result")
+    except Exception as e:
+        print(f"[CookieHealth] D1 query note: {e}")
+        return None
+
+
+def _probe_cookie_file(cookie_path):
+    """Return True when this jar still gets a real audio URL out of YouTube.
+
+    Probes a throwaway copy: yt-dlp rewrites the jar on exit, and corrupting the
+    canonical file would break every request that uses it.
+    """
+    cookie_temp = None
+    try:
+        fd, cookie_temp = tempfile.mkstemp(prefix="health_cookie_", suffix=".txt")
+        with os.fdopen(fd, "wb") as dst, open(cookie_path, "rb") as src:
+            shutil.copyfileobj(src, dst)
+    except Exception:
+        if cookie_temp:
+            try:
+                os.remove(cookie_temp)
+            except Exception:
+                pass
+        return False
+
+    opts = {
+        'format': 'bestaudio[ext=m4a]/bestaudio',
+        'quiet': True,
+        'no_warnings': True,
+        'skip_download': True,
+        'noplaylist': True,
+        'socket_timeout': 10,
+        'cookiefile': cookie_temp,
+        'js_runtimes': get_js_runtimes_config(),
+        'extractor_args': {'youtube': {'player_client': ['web_embedded']}},
+    }
+    if PROXY_URL:
+        opts['proxy'] = PROXY_URL
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={COOKIE_PROBE_VIDEO}", download=False)
+        if info.get('entries'):
+            info = info['entries'][0]
+        return bool(info.get('url'))
+    except Exception:
+        return False
+    finally:
+        try:
+            os.remove(cookie_temp)
+        except Exception:
+            pass
+
+
+def _disable_cookie(cookie_id):
+    """Soft-remove a dead cookie from D1 and from the in-memory pool."""
+    global _d1_cookies_pool
+    _d1_query("UPDATE youtube_cookies SET is_valid = 0 WHERE id = ?", [cookie_id])
+    with _d1_lock:
+        _d1_cookies_pool = [row for row in _d1_cookies_pool if row.get("id") != cookie_id]
+
+
+_cookie_check_cursor = 0
+
+
+def _cookie_health_tick():
+    """Validate one batch of cookies, disable the failures, then top the pool up."""
+    global _cookie_check_cursor
+
+    with _d1_lock:
+        pool = list(_d1_cookies_pool)
+    if not pool:
+        sync_cookies_from_d1(force=True)
+        with _d1_lock:
+            pool = list(_d1_cookies_pool)
+        if not pool:
+            return
+
+    if _cookie_check_cursor >= len(pool):
+        _cookie_check_cursor = 0
+    batch = pool[_cookie_check_cursor:_cookie_check_cursor + COOKIE_CHECK_BATCH]
+    _cookie_check_cursor = (_cookie_check_cursor + len(batch)) % max(1, len(pool))
+
+    dead = []
+    for row in batch:
+        try:
+            path = _materialise_cookie_file(row)
+        except Exception:
+            path = None
+        if not path:
+            continue
+        if _probe_cookie_file(path):
+            continue
+        dead.append(row)
+
+    if batch and len(dead) == len(batch):
+        # A whole batch failing at once is usually YouTube being unreachable rather
+        # than every cookie dying together - do not wipe the pool over a blip.
+        print(f"[CookieHealth] All {len(dead)} probed cookies failed - treating as transient, keeping them")
+        return
+
+    if not dead:
+        return
+
+    for row in dead:
+        print(f"[CookieHealth] Cookie {row.get('id')} is dead -> disabled in D1, refilling from spares")
+        _disable_cookie(row.get("id"))
+    sync_cookies_from_d1(force=True)
+
+
+def _start_cookie_health_monitor():
+    if not ENABLE_COOKIE_HEALTH:
+        return
+    if not (CF_ACCOUNT_ID and CF_DB_ID and CF_TOKEN):
+        print("[CookieHealth] D1 credentials missing - monitor disabled")
+        return
+
+    # Only one gunicorn worker should probe, otherwise every cookie is checked
+    # twice and the two workers race on the same D1 rows.
+    lock_file = None
+    try:
+        import fcntl
+        lock_file = open(os.path.join(BASE_TEMP_DIR, "cookie_health.lock"), "w")
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except Exception:
+        if lock_file is not None:
+            print("[CookieHealth] Another worker already owns the monitor")
+            return
+
+    def worker():
+        while True:
+            try:
+                time.sleep(COOKIE_CHECK_INTERVAL)
+                _cookie_health_tick()
+            except Exception as e:
+                print(f"[CookieHealth] tick note: {e}")
+
+    threading.Thread(target=worker, daemon=True, name="cookie_health").start()
+    print(f"[CookieHealth] Monitor active (every {COOKIE_CHECK_INTERVAL}s, batch {COOKIE_CHECK_BATCH})")
+
+
+_start_cookie_health_monitor()
 
 
 def check_cache_size_and_cleanup(preserve_paths=None):
