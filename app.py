@@ -305,6 +305,12 @@ LIVE_URL_TTL = int(os.environ.get("LIVE_URL_TTL", "14400"))  # upstream links li
 
 _live_cache = {}
 _live_lock = threading.Lock()
+LIVE_CACHE_MAX = int(os.environ.get("LIVE_CACHE_MAX", "500"))
+
+# One shared, bounded pool for the racing extraction strategies. Building a fresh
+# executor per resolve leaked threads (yt-dlp extraction cannot be interrupted, so a
+# cancelled future keeps running) and burned CPU on the losers.
+_live_executor = concurrent.futures.ThreadPoolExecutor(max_workers=6, thread_name_prefix="live_resolve")
 
 # Reused HTTP session: keeps TCP/TLS connections to the CDN alive, which is what
 # takes the warm pass-through latency from ~2s down to a few hundred ms.
@@ -332,6 +338,12 @@ def _live_cache_get(key):
 def _live_cache_put(key, entry):
     with _live_lock:
         _live_cache[key] = entry
+        if len(_live_cache) > LIVE_CACHE_MAX:
+            now = time.time()
+            for k in [k for k, v in _live_cache.items() if now >= v["expires"]]:
+                _live_cache.pop(k, None)
+            while len(_live_cache) > LIVE_CACHE_MAX:
+                _live_cache.pop(next(iter(_live_cache)), None)
 
 
 def _live_cache_drop(key):
@@ -357,25 +369,49 @@ def _extract_live_entry(video_url, strategy):
     }
     if 'player_client' in strategy:
         opts['extractor_args'] = {'youtube': {'player_client': strategy['player_client']}}
-    if 'cookiefile' in strategy:
-        opts['cookiefile'] = strategy['cookiefile']
     if PROXY_URL:
         opts['proxy'] = PROXY_URL
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(video_url, download=False)
-    if info.get('entries'):
-        info = info['entries'][0]
-    direct = info.get('url')
-    if not direct or not str(direct).startswith('http'):
-        raise Exception("extraction returned no direct upstream url")
-    return {
-        'url': direct,
-        'headers': dict(info.get('http_headers') or {}),
-        'title': info.get('title'),
-        'duration': info.get('duration'),
-        'id': info.get('id'),
-    }
+    # yt-dlp writes the cookie jar back on exit, and several strategy workers share
+    # one jar while running in parallel. Concurrent writes truncate the file, after
+    # which every later extraction fails auth with a bot-check - that is what made
+    # the live endpoint drift from ~1s to a timeout. Give each worker its own copy.
+    cookie_temp = None
+    if 'cookiefile' in strategy:
+        try:
+            fd, cookie_temp = tempfile.mkstemp(prefix="live_cookie_", suffix=".txt")
+            with os.fdopen(fd, "wb") as dst, open(strategy['cookiefile'], "rb") as src:
+                shutil.copyfileobj(src, dst)
+            opts['cookiefile'] = cookie_temp
+        except Exception:
+            if cookie_temp:
+                try:
+                    os.remove(cookie_temp)
+                except Exception:
+                    pass
+            cookie_temp = None
+
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+        if info.get('entries'):
+            info = info['entries'][0]
+        direct = info.get('url')
+        if not direct or not str(direct).startswith('http'):
+            raise Exception("extraction returned no direct upstream url")
+        return {
+            'url': direct,
+            'headers': dict(info.get('http_headers') or {}),
+            'title': info.get('title'),
+            'duration': info.get('duration'),
+            'id': info.get('id'),
+        }
+    finally:
+        if cookie_temp:
+            try:
+                os.remove(cookie_temp)
+            except Exception:
+                pass
 
 
 def resolve_live_audio(video_url, force=False):
@@ -407,9 +443,8 @@ def resolve_live_audio(video_url, force=False):
         ])
 
     last_error = None
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(strategies))
+    futures = [_live_executor.submit(_extract_live_entry, video_url, s) for s in strategies]
     try:
-        futures = [executor.submit(_extract_live_entry, video_url, s) for s in strategies]
         for future in concurrent.futures.as_completed(futures):
             try:
                 entry = future.result()
@@ -421,7 +456,8 @@ def resolve_live_audio(video_url, force=False):
             print(f"[Live] Resolved direct audio URL for {entry.get('id', video_url)}")
             return entry
     finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+        for f in futures:
+            f.cancel()
 
     raise last_error if last_error else Exception("live resolution failed across all strategies")
 
