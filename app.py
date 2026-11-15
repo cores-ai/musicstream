@@ -449,18 +449,21 @@ def resolve_live_audio(video_url, force=False):
             return cached
 
     cookie_file = get_active_cookie_file()
-    # Only the mobile clients still hand out a real audio format: probed locally,
-    # `android` returns audio with or without cookies, while web/ios/tv/web_embedded
-    # and mweb never return media (web_embedded/mweb only yield storyboards). Racing
-    # the dead clients just burns CPU and delays the cold resolve, so keep it short.
+    # Only three player clients still return a real audio format at all (verified
+    # against yt-dlp 2026.08.19): android, android_vr and visionos. web/ios/tv/
+    # web_safari/web_music/web_embedded/mweb answer with "Requested format is not
+    # available" or a sign-in wall, so racing them only burns CPU. android_vr and
+    # visionos lead because they are the least likely to trip the datacenter
+    # bot-check that kills the plain `android` client.
     strategies = [
+        {'player_client': ['android_vr']},
         {'player_client': ['android']},
-        {'player_client': ['visionos', 'ios']},
-        {},
+        {'player_client': ['visionos']},
     ]
     if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
-        # Cookies can still lift a datacenter-IP bot-check, so keep one cookie-bound
-        # attempt - but only on the client that actually returns audio.
+        # Cookies can still lift a datacenter-IP bot-check, so pair them with the
+        # clients that actually return audio.
+        strategies.append({'player_client': ['android_vr'], 'cookiefile': cookie_file})
         strategies.append({'player_client': ['android'], 'cookiefile': cookie_file})
 
     last_error = None
@@ -1250,7 +1253,7 @@ def health():
     return jsonify({
         "status": "healthy",
         "service": "YouTube Music API",
-        "version": "2026.11.16-fastresolve-v1",
+        "version": "2026.11.16-fastresolve-v2",
         "dev_by": "iq4u8",
         "direct_running": not REQUIRE_API_KEY,
         "cookies_loaded": cookies_loaded(),
