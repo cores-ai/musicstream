@@ -328,7 +328,7 @@ LIVE_CACHE_MAX = int(os.environ.get("LIVE_CACHE_MAX", "500"))
 # One shared, bounded pool for the racing extraction strategies. Building a fresh
 # executor per resolve leaked threads (yt-dlp extraction cannot be interrupted, so a
 # cancelled future keeps running) and burned CPU on the losers.
-_live_executor = concurrent.futures.ThreadPoolExecutor(max_workers=6, thread_name_prefix="live_resolve")
+_live_executor = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="live_resolve")
 
 # Reused HTTP session: keeps TCP/TLS connections to the CDN alive, which is what
 # takes the warm pass-through latency from ~2s down to a few hundred ms.
@@ -461,10 +461,16 @@ def resolve_live_audio(video_url, force=False):
         {'player_client': ['visionos']},
     ]
     if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
-        # Cookies can still lift a datacenter-IP bot-check, so pair them with the
-        # clients that actually return audio.
-        strategies.append({'player_client': ['android_vr'], 'cookiefile': cookie_file})
-        strategies.append({'player_client': ['android'], 'cookiefile': cookie_file})
+        # Cookies can still lift a datacenter-IP bot-check, so pair them with every
+        # client that can return audio - including the authenticated-only ones
+        # (web_creator/web) that are dead without a jar but viable with one.
+        strategies += [
+            {'player_client': ['web_creator'], 'cookiefile': cookie_file},
+            {'player_client': ['android_vr'], 'cookiefile': cookie_file},
+            {'player_client': ['android'], 'cookiefile': cookie_file},
+            {'player_client': ['visionos'], 'cookiefile': cookie_file},
+            {'player_client': ['web'], 'cookiefile': cookie_file},
+        ]
 
     last_error = None
     futures = [_live_executor.submit(_extract_live_entry, video_url, s) for s in strategies]
@@ -1253,7 +1259,8 @@ def health():
     return jsonify({
         "status": "healthy",
         "service": "YouTube Music API",
-        "version": "2026.11.16-fastresolve-v2",
+        "version": "2026.11.16-fastresolve-v3",
+        "ytdlp": getattr(getattr(yt_dlp, "version", None), "__version__", "unknown"),
         "dev_by": "iq4u8",
         "direct_running": not REQUIRE_API_KEY,
         "cookies_loaded": cookies_loaded(),
