@@ -14,6 +14,7 @@ import hashlib
 import glob
 import shutil
 import tempfile
+import re
 import concurrent.futures
 from datetime import datetime, timezone
 
@@ -353,6 +354,14 @@ def _live_cache_get(key):
         return entry
 
 
+def _cache_live_entry(key, entry):
+    """Stamp the expiry, cache the entry and return it. Beats Stream (dev by iq4u8)"""
+    entry['expires'] = time.time() + LIVE_URL_TTL
+    _live_cache_put(key, entry)
+    print(f"[Live] Resolved direct audio URL for {entry.get('id', key)}")
+    return entry
+
+
 def _live_cache_put(key, entry):
     with _live_lock:
         _live_cache[key] = entry
@@ -375,9 +384,13 @@ def _extract_live_entry(video_url, strategy):
     Beats Stream (dev by iq4u8)
     """
     opts = {
-        # Audio-only on purpose: falling back to 'best' would silently stream a
-        # full video file (3-7x the bytes) for an audio-only request.
-        'format': 'bestaudio[ext=m4a]/bestaudio',
+        # 'bestaudio[ext=m4a]/bestaudio' matches nothing on the android/android_vr
+        # clients, because they expose no standalone audio-only format at all -
+        # only the muxed itag 18 mp4 - so yt-dlp raises "Requested format is not
+        # available" and /live answers 502 for every video. Strategies that need
+        # the muxed format opt into '.../best' explicitly; everyone else stays
+        # audio-only so we never stream a video file for an audio request.
+        'format': strategy.get('format') or 'bestaudio[ext=m4a]/bestaudio',
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
@@ -423,6 +436,11 @@ def _extract_live_entry(video_url, strategy):
             'title': info.get('title'),
             'duration': info.get('duration'),
             'id': info.get('id'),
+            # Audio-only picks (itag 140 m4a / 251 webm) are ~4MB for a song; the
+            # muxed itag 18 fallback carries the video too and is 3-7x the bytes.
+            # resolve_live_audio uses this flag to keep waiting for an audio-only
+            # result instead of streaming a video file for an audio request.
+            'audio_only': (info.get('vcodec') in (None, 'none')),
         }
     finally:
         if cookie_temp:
@@ -438,7 +456,9 @@ def resolve_live_audio(video_url, force=False):
 
     All player-client strategies are raced in parallel and the first successful
     extraction wins, so a cold resolve only costs as long as the fastest
-    successful strategy (~1-3s) instead of the sum of every attempt.
+    successful strategy (~1-3s) instead of the sum of every attempt. An
+    audio-only result is preferred over the muxed itag 18 fallback, which would
+    otherwise stream the whole video just to play its audio.
     Result is cached in memory; force=True re-resolves after a signature expires.
     Beats Stream (dev by iq4u8)
     """
@@ -449,30 +469,32 @@ def resolve_live_audio(video_url, force=False):
             return cached
 
     cookie_file = get_active_cookie_file()
-    # Only three player clients still return a real audio format at all (verified
-    # against yt-dlp 2026.08.19): android, android_vr and visionos. web/ios/tv/
-    # web_safari/web_music/web_embedded/mweb answer with "Requested format is not
-    # available" or a sign-in wall, so racing them only burns CPU. android_vr and
-    # visionos lead because they are the least likely to trip the datacenter
-    # bot-check that kills the plain `android` client.
+    # All three clients below can actually return a playable stream. visionos is
+    # the only one that exposes a real audio-only format (itag 140 m4a); android
+    # and android_vr only serve the muxed itag 18 mp4, so they carry the video as
+    # well (3-7x the bytes) and exist purely as a fallback. web/ios/tv/mweb were
+    # dropped: they answer with "Requested format is not available" or a sign-in
+    # wall even with cookies, so racing them only burned CPU.
     strategies = [
-        {'player_client': ['android_vr']},
-        {'player_client': ['android']},
         {'player_client': ['visionos']},
+        {'player_client': ['android_vr'], 'format': 'bestaudio[ext=m4a]/bestaudio/best'},
+        {'player_client': ['android'], 'format': 'bestaudio[ext=m4a]/bestaudio/best'},
     ]
     if cookie_file and os.path.exists(cookie_file) and os.path.getsize(cookie_file) > 0:
         # Cookies can still lift a datacenter-IP bot-check, so pair them with every
-        # client that can return audio - including the authenticated-only ones
+        # client that can return a stream - including the authenticated-only ones
         # (web_creator/web) that are dead without a jar but viable with one.
-        strategies += [
+        strategies = [
             {'player_client': ['web_creator'], 'cookiefile': cookie_file},
-            {'player_client': ['android_vr'], 'cookiefile': cookie_file},
-            {'player_client': ['android'], 'cookiefile': cookie_file},
             {'player_client': ['visionos'], 'cookiefile': cookie_file},
             {'player_client': ['web'], 'cookiefile': cookie_file},
+        ] + strategies + [
+            {'player_client': ['android_vr'], 'cookiefile': cookie_file, 'format': 'bestaudio[ext=m4a]/bestaudio/best'},
+            {'player_client': ['android'], 'cookiefile': cookie_file, 'format': 'bestaudio[ext=m4a]/bestaudio/best'},
         ]
 
     last_error = None
+    muxed_fallback = None
     futures = [_live_executor.submit(_extract_live_entry, video_url, s) for s in strategies]
     try:
         for future in concurrent.futures.as_completed(futures):
@@ -481,10 +503,15 @@ def resolve_live_audio(video_url, force=False):
             except Exception as e:
                 last_error = e
                 continue
-            entry['expires'] = time.time() + LIVE_URL_TTL
-            _live_cache_put(key, entry)
-            print(f"[Live] Resolved direct audio URL for {entry.get('id', video_url)}")
-            return entry
+            if not entry.get('audio_only') and muxed_fallback is None:
+                # Hold the muxed pick back and keep waiting: an audio-only strategy
+                # may still land, and it is several times smaller to stream.
+                muxed_fallback = entry
+                continue
+            if entry.get('audio_only'):
+                return _cache_live_entry(key, entry)
+        if muxed_fallback is not None:
+            return _cache_live_entry(key, muxed_fallback)
     finally:
         for f in futures:
             f.cancel()
@@ -768,8 +795,6 @@ def check_cache_size_and_cleanup(preserve_paths=None):
                 except Exception as e:
                     print(f"[Beats Stream] Error deleting file {file_path}: {e}")
 
-
-import re
 
 def normalize_video_url(url):
     """
@@ -1259,7 +1284,7 @@ def health():
     return jsonify({
         "status": "healthy",
         "service": "YouTube Music API",
-        "version": "2026.11.16-fastresolve-v3",
+        "version": "2026.11.16-fastresolve-v4",
         "ytdlp": getattr(getattr(yt_dlp, "version", None), "__version__", "unknown"),
         "dev_by": "iq4u8",
         "direct_running": not REQUIRE_API_KEY,
